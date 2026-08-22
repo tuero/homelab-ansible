@@ -1,0 +1,91 @@
+---
+- name: Create monitoring compose directory
+  ansible.builtin.file:
+    path: "{{ monitoring_stack_dir }}"
+    state: directory
+    owner: "{{ dev_user }}"
+    group: "{{ dev_user }}"
+    mode: "0755"
+
+- name: Create monitoring application-data directories
+  ansible.builtin.file:
+    path: "{{ monitoring_appdata_root }}/{{ item.name }}"
+    state: directory
+    owner: "{{ dev_user }}"
+    group: "{{ dev_user }}"
+    mode: "{{ item.mode }}"
+  loop:
+    - name: homepage
+      mode: "0755"
+    - name: homepage/icons
+      mode: "0755"
+    - name: uptime-kuma
+      mode: "0700"
+
+- name: Install Homepage settings
+  ansible.builtin.template:
+    src: settings.yaml.j2
+    dest: "{{ monitoring_appdata_root }}/homepage/settings.yaml"
+    owner: "{{ dev_user }}"
+    group: "{{ dev_user }}"
+    mode: "0644"
+  register: homepage_settings
+
+- name: Remove legacy Homepage Docker integration configuration
+  ansible.builtin.file:
+    path: "{{ monitoring_appdata_root }}/homepage/docker.yaml"
+    state: absent
+
+- name: Install Homepage bookmarks
+  ansible.builtin.template:
+    src: bookmarks.yaml.j2
+    dest: "{{ monitoring_appdata_root }}/homepage/bookmarks.yaml"
+    owner: "{{ dev_user }}"
+    group: "{{ dev_user }}"
+    mode: "0644"
+  register: homepage_bookmarks
+
+- name: Install local Homepage icons
+  ansible.builtin.template:
+    src: scotiabank.svg.j2
+    dest: "{{ monitoring_appdata_root }}/homepage/icons/scotiabank.svg"
+    owner: "{{ dev_user }}"
+    group: "{{ dev_user }}"
+    mode: "0644"
+  register: homepage_icons
+
+- name: Install Homepage service configuration
+  ansible.builtin.template:
+    src: services.yaml.j2
+    dest: "{{ monitoring_appdata_root }}/homepage/services.yaml"
+    owner: "{{ dev_user }}"
+    group: "{{ dev_user }}"
+    mode: "0644"
+  register: homepage_services
+
+- name: Install monitoring compose file
+  ansible.builtin.template:
+    src: compose.yml.j2
+    dest: "{{ monitoring_stack_dir }}/compose.yml"
+    owner: "{{ dev_user }}"
+    group: "{{ dev_user }}"
+    mode: "0644"
+
+- name: Deploy monitoring stack
+  community.docker.docker_compose_v2:
+    project_src: "{{ monitoring_stack_dir }}"
+    state: present
+    remove_orphans: true
+
+- name: Recreate Homepage after configuration changes
+  community.docker.docker_compose_v2:
+    project_src: "{{ monitoring_stack_dir }}"
+    services:
+      - homepage
+    state: present
+    recreate: always
+  when: >-
+    homepage_settings.changed
+    or homepage_bookmarks.changed
+    or homepage_icons.changed
+    or homepage_services.changed

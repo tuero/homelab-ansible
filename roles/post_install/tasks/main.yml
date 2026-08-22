@@ -1,0 +1,179 @@
+---
+# ---------------------------------------------------------
+# Git identity
+# ---------------------------------------------------------
+
+- name: Read current global Git user name
+  ansible.builtin.command:
+    cmd: git config --global --get user.name
+  become_user: "{{ dev_user }}"
+  environment:
+    HOME: "{{ dev_home }}"
+  register: git_user_name
+  changed_when: false
+  failed_when: false
+
+- name: Set global Git user name
+  ansible.builtin.command:
+    cmd: git config --global user.name "Jake Tuero"
+  become_user: "{{ dev_user }}"
+  environment:
+    HOME: "{{ dev_home }}"
+  when: git_user_name.stdout != "Jake Tuero"
+
+- name: Read current global Git email
+  ansible.builtin.command:
+    cmd: git config --global --get user.email
+  become_user: "{{ dev_user }}"
+  environment:
+    HOME: "{{ dev_home }}"
+  register: git_user_email
+  changed_when: false
+  failed_when: false
+
+- name: Set global Git email
+  ansible.builtin.command:
+    cmd: git config --global user.email "jake@tuero.ca"
+  become_user: "{{ dev_user }}"
+  environment:
+    HOME: "{{ dev_home }}"
+  when: git_user_email.stdout != "jake@tuero.ca"
+
+- name: Read current global Git initial branch
+  ansible.builtin.command:
+    cmd: git config --global --get init.defaultBranch
+  become_user: "{{ dev_user }}"
+  environment:
+    HOME: "{{ dev_home }}"
+  register: git_init_branch
+  changed_when: false
+  failed_when: false
+
+- name: Set global Git initial branch
+  ansible.builtin.command:
+    cmd: git config --global init.defaultBranch master
+  become_user: "{{ dev_user }}"
+  environment:
+    HOME: "{{ dev_home }}"
+  when: git_init_branch.stdout != "master"
+
+
+# ---------------------------------------------------------
+# Neovim configuration
+# ---------------------------------------------------------
+
+- name: Ensure ~/.config exists
+  ansible.builtin.file:
+    path: "{{ dev_home }}/.config"
+    state: directory
+    owner: "{{ dev_user }}"
+    group: "{{ dev_user }}"
+    mode: "0755"
+
+- name: Clone Neovim configuration
+  ansible.builtin.git:
+    repo: git@github.com:tuero/astronvim_config.git
+    dest: "{{ dev_home }}/.config/nvim"
+    version: HEAD
+    update: true
+    key_file: "{{ github_private_key_path }}"
+  become_user: "{{ dev_user }}"
+  environment:
+    HOME: "{{ dev_home }}"
+
+
+# ---------------------------------------------------------
+# Dotfiles
+# ---------------------------------------------------------
+
+- name: Clone dotfiles repository
+  ansible.builtin.git:
+    repo: git@github.com:tuero/dotfiles.git
+    dest: "{{ dev_home }}/dotfiles"
+    version: HEAD
+    update: true
+    key_file: "{{ github_private_key_path }}"
+  become_user: "{{ dev_user }}"
+  environment:
+    HOME: "{{ dev_home }}"
+
+
+# ---------------------------------------------------------
+# clangd configuration
+# ---------------------------------------------------------
+
+- name: Ensure clangd configuration directory exists
+  ansible.builtin.file:
+    path: "{{ dev_home }}/.config/clangd"
+    state: directory
+    owner: "{{ dev_user }}"
+    group: "{{ dev_user }}"
+    mode: "0755"
+
+- name: Link clangd configuration from dotfiles
+  ansible.builtin.file:
+    src: "{{ dev_home }}/dotfiles/.clangd"
+    dest: "{{ dev_home }}/.config/clangd/config.yaml"
+    state: link
+    owner: "{{ dev_user }}"
+    group: "{{ dev_user }}"
+
+# ---------------------------------------------------------
+# vcpkg
+# ---------------------------------------------------------
+
+- name: Clone vcpkg repository
+  ansible.builtin.git:
+    repo: https://github.com/microsoft/vcpkg.git
+    dest: "{{ dev_home }}/vcpkg"
+    version: master
+    update: true
+  become_user: "{{ dev_user }}"
+  environment:
+    HOME: "{{ dev_home }}"
+
+- name: Bootstrap vcpkg
+  ansible.builtin.command:
+    cmd: ./bootstrap-vcpkg.sh
+    chdir: "{{ dev_home }}/vcpkg"
+    creates: "{{ dev_home }}/vcpkg/vcpkg"
+  become_user: "{{ dev_user }}"
+  environment:
+    HOME: "{{ dev_home }}"
+
+- name: Add vcpkg environment variables to bashrc
+  ansible.builtin.blockinfile:
+    path: "{{ dev_home }}/.bashrc"
+    owner: "{{ dev_user }}"
+    group: "{{ dev_user }}"
+    marker: "# {mark} ANSIBLE VCPKG"
+    block: |
+      export VCPKG_ROOT={{ dev_home }}/vcpkg
+      export PATH=$VCPKG_ROOT:$PATH
+
+# ---------------------------------------------------------
+# OpenCode
+# ---------------------------------------------------------
+
+- name: Install or update OpenCode
+  ansible.builtin.shell: |
+    set -o pipefail
+    curl -fsSL https://opencode.ai/install | bash -s -- --no-modify-path
+  args:
+    executable: /bin/bash
+  become_user: "{{ dev_user }}"
+  environment:
+    HOME: "{{ dev_home }}"
+    SHELL: /bin/bash
+    PATH: "{{ dev_home }}/.opencode/bin:{{ ansible_facts['env']['PATH'] }}"
+  register: opencode_install
+  changed_when: "'already installed' not in opencode_install.stdout"
+
+- name: Add OpenCode to PATH
+  ansible.builtin.blockinfile:
+    path: "{{ dev_home }}/.bashrc"
+    owner: "{{ dev_user }}"
+    group: "{{ dev_user }}"
+    marker: "# {mark} ANSIBLE OPENCODE"
+    block: |
+      export PATH="$HOME/.opencode/bin:$PATH"

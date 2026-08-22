@@ -1,0 +1,249 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+umask 077
+
+APPDATA_ROOT="{{ service_backup_appdata_root }}"
+STAGING_ROOT="{{ service_backup_staging_root }}"
+BACKUP_MOUNT="{{ service_backup_mount }}"
+DEST_ROOT="{{ service_backup_destination }}"
+CURRENT_DIR="{{ service_backup_current_dir }}"
+ARCHIVE_NAME="{{ service_backup_archive_name }}"
+CHECKSUM_NAME="{{ service_backup_checksum_name }}"
+MANIFEST_NAME="{{ service_backup_manifest_name }}"
+SUCCESS_NAME="{{ service_backup_success_name }}"
+LOCK_FILE="{{ service_backup_lock_file }}"
+
+BACKUP_ID="$(date +%Y%m%dT%H%M%S%z)"
+INCOMING_DIR="${DEST_ROOT}/.incoming-${BACKUP_ID}"
+PREVIOUS_DIR="${DEST_ROOT}/.previous-${BACKUP_ID}"
+LOCAL_ARCHIVE_DIR="${STAGING_ROOT}/.archive-${BACKUP_ID}"
+LOCAL_ARCHIVE="${LOCAL_ARCHIVE_DIR}/${ARCHIVE_NAME}"
+
+COMPOSE_PROJECTS=(
+{% for project in service_backup_compose_projects %}
+  "{{ project }}"
+{% endfor %}
+)
+
+declare -A RUNNING_SERVICES=()
+
+mkdir -p "$(dirname "$LOCK_FILE")"
+exec 9>"$LOCK_FILE"
+
+if ! flock -n 9; then
+  echo "[$(date -Is)] ERROR: Another appdata backup is already running" >&2
+  exit 1
+fi
+
+log() {
+  echo "[$(date -Is)] $*"
+}
+
+restart_services() {
+  local rc=0
+  local project
+  local services_string
+  local services
+
+  for project in "${!RUNNING_SERVICES[@]}"; do
+    services_string="${RUNNING_SERVICES[$project]}"
+    read -r -a services <<< "$services_string"
+
+    log "Starting services in $project: ${services[*]}"
+
+    if ! docker compose \
+      --project-directory "$project" \
+      start "${services[@]}"; then
+      log "ERROR: Failed to restart services in $project"
+      rc=1
+    fi
+  done
+
+  return "$rc"
+}
+
+cleanup_incoming() {
+  # If publishing failed after moving current aside, restore the last known
+  # published archive before removing temporary data.
+  if [[ -d "$PREVIOUS_DIR" && ! -e "$CURRENT_DIR" ]]; then
+    mv "$PREVIOUS_DIR" "$CURRENT_DIR" || true
+  fi
+
+  rm -rf "$INCOMING_DIR" "$LOCAL_ARCHIVE_DIR"
+}
+
+#
+# Verify TrueNAS before stopping anything.
+#
+log "Triggering service-backups automount"
+
+timeout 30 ls "$BACKUP_MOUNT" >/dev/null
+
+if ! findmnt -n -t cifs --target "$BACKUP_MOUNT" >/dev/null; then
+  log "ERROR: $BACKUP_MOUNT is not mounted over CIFS"
+  exit 1
+fi
+
+mkdir -p "$STAGING_ROOT"
+mkdir -p "$DEST_ROOT"
+
+#
+# Record which services were running before the backup.
+#
+for project in "${COMPOSE_PROJECTS[@]}"; do
+  if [[ ! -f "$project/compose.yml" ]]; then
+    log "ERROR: Expected Compose project is missing: $project"
+    exit 1
+  fi
+
+  mapfile -t services < <(
+    docker compose \
+      --project-directory "$project" \
+      ps --services --filter status=running
+  )
+
+  if [[ -n "${services[*]:-}" ]]; then
+    RUNNING_SERVICES["$project"]="${services[*]}"
+  fi
+done
+
+#
+# Ensure containers are restarted if anything below fails.
+#
+trap restart_services EXIT
+
+#
+# Stop only services that were actually running.
+#
+for project in "${!RUNNING_SERVICES[@]}"; do
+  read -r -a services <<< "${RUNNING_SERVICES[$project]}"
+
+  log "Stopping services in $project: ${services[*]}"
+
+  docker compose \
+    --project-directory "$project" \
+    stop --timeout 60 "${services[@]}"
+done
+
+#
+# Create a consistent local mirror while applications are stopped.
+#
+log "Mirroring appdata to local staging"
+
+rsync \
+  -a \
+  --delete \
+  --delete-delay \
+  "$APPDATA_ROOT/" \
+  "$STAGING_ROOT/"
+
+#
+# Applications no longer need to remain stopped.
+#
+log "Local staging complete; restarting services"
+
+if ! restart_services; then
+  trap - EXIT
+  log "ERROR: One or more services failed to restart"
+  exit 1
+fi
+
+trap - EXIT
+
+#
+# Create a metadata-preserving archive from the consistent staging tree.
+#
+{% for directory in service_backup_expected_directories %}
+if [[ ! -d "${STAGING_ROOT}/{{ directory }}" ]]; then
+  log "ERROR: Expected appdata directory is missing from staging: {{ directory }}"
+  exit 1
+fi
+{% endfor %}
+
+mkdir -p "$LOCAL_ARCHIVE_DIR"
+
+log "Creating compressed appdata archive"
+
+tar \
+  --create \
+  --file "$LOCAL_ARCHIVE" \
+  --use-compress-program "zstd -T0 -19" \
+  --numeric-owner \
+  --acls \
+  --xattrs \
+  --xattrs-include='*' \
+  --directory "$STAGING_ROOT" \
+  .
+
+(
+  cd "$LOCAL_ARCHIVE_DIR"
+  sha256sum "$ARCHIVE_NAME" > "$CHECKSUM_NAME"
+)
+
+ARCHIVE_CONTENTS="$(tar --list --use-compress-program zstd --file "$LOCAL_ARCHIVE")"
+{% for directory in service_backup_expected_directories %}
+if ! grep -Fxq "./{{ directory }}/" <<< "$ARCHIVE_CONTENTS"; then
+  log "ERROR: Expected appdata directory is missing from archive: {{ directory }}"
+  exit 1
+fi
+{% endfor %}
+
+ARCHIVE_SHA256="$(cut -d' ' -f1 "${LOCAL_ARCHIVE_DIR}/${CHECKSUM_NAME}")"
+
+cat > "${LOCAL_ARCHIVE_DIR}/${MANIFEST_NAME}" <<EOF
+format_version: 1
+backup_id: ${BACKUP_ID}
+source_host: {{ service_backup_node_name }}
+created_at: $(date -Is)
+archive: ${ARCHIVE_NAME}
+archive_sha256: ${ARCHIVE_SHA256}
+appdata_bytes: $(du -sb "$STAGING_ROOT" | cut -f1)
+expected_directories:
+{% for directory in service_backup_expected_directories %}
+  - {{ directory }}
+{% endfor %}
+EOF
+
+cat > "${LOCAL_ARCHIVE_DIR}/${SUCCESS_NAME}" <<EOF
+backup_id: ${BACKUP_ID}
+archive_sha256: ${ARCHIVE_SHA256}
+published_at: $(date -Is)
+EOF
+
+#
+# Upload and verify the incoming generation before replacing the published one.
+# The previous current directory is retained until the replacement succeeds.
+#
+trap cleanup_incoming EXIT
+
+log "Uploading incoming appdata archive"
+mkdir -p "$INCOMING_DIR"
+rsync -a --chmod=F600,D700 "${LOCAL_ARCHIVE_DIR}/" "$INCOMING_DIR/"
+
+(
+  cd "$INCOMING_DIR"
+  sha256sum --check "$CHECKSUM_NAME"
+)
+
+if [[ -d "$CURRENT_DIR" ]]; then
+  mv "$CURRENT_DIR" "$PREVIOUS_DIR"
+fi
+
+if ! mv "$INCOMING_DIR" "$CURRENT_DIR"; then
+  if [[ -d "$PREVIOUS_DIR" ]]; then
+    mv "$PREVIOUS_DIR" "$CURRENT_DIR"
+  fi
+  log "ERROR: Failed to publish incoming appdata archive"
+  exit 1
+fi
+
+rm -rf "$PREVIOUS_DIR"
+cat > "$DEST_ROOT/.last-success" <<EOF
+backup_id: ${BACKUP_ID}
+archive_sha256: ${ARCHIVE_SHA256}
+published_at: $(date -Is)
+EOF
+trap - EXIT
+cleanup_incoming
+
+log "Backup completed successfully"

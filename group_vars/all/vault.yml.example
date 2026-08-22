@@ -1,0 +1,21 @@
+---
+# Copy this file to vault.yml, replace the placeholders, and then encrypt it:
+#
+#   cp group_vars/all/vault.yml.example group_vars/all/vault.yml
+#   nano group_vars/all/vault.yml
+#   ansible-vault encrypt group_vars/all/vault.yml
+#
+# Never leave real secrets in an unencrypted file.
+
+vault_truenas_smb_password: "REPLACE_ME"
+
+# Persistent private key used BY the GPU VM to authenticate to GitHub.
+vault_github_private_key: |
+  -----BEGIN OPENSSH PRIVATE KEY-----
+  REPLACE_ME
+  -----END OPENSSH PRIVATE KEY-----
+
+vault_github_public_key: "ssh-ed25519 REPLACE_ME gpu-server-github"
+
+# Jupyter Server password hash used only by the GPU VM.
+vault_jupyter_password_hash: "REPLACE_ME"

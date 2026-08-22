@@ -1,0 +1,65 @@
+---
+# GPU/development-only settings. Shared Linux user, common packages, timezone,
+# inbound SSH keys, and TrueNAS connection defaults live in group_vars/all.
+
+enable_x11_forwarding: true
+
+# Packages needed by the GPU development environment in addition to the
+# lightweight package set installed by the common role.
+gpu_dev_packages:
+  - build-essential
+  - cifs-utils
+  - lazygit
+  - libgl-dev
+  - libx11-dev
+  - mesa-utils
+  - nodejs
+  - npm
+  - pciutils
+  - pkg-config
+  - ripgrep
+  - snapd
+  - xauth
+
+# Rust / LLVM / Conda
+llvm_version: "22"
+miniconda_url: "https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh"
+miniconda_dir: "{{ dev_home }}/miniconda3"
+
+# GCC is deliberately installed SIDE-BY-SIDE and does not replace Ubuntu's
+# /usr/bin/gcc. CUDA 13.3 supports GCC through major version 15, while GCC
+# 16.2 is useful for normal C/C++ work.
+gcc_version: "16.2.0"
+gcc_short_version: "16.2"
+gcc_src_dir: "/usr/local/src/gcc-{{ gcc_version }}"
+gcc_build_dir: "/usr/local/src/gcc-{{ gcc_version }}-build"
+gcc_tarball: "/usr/local/src/gcc-{{ gcc_version }}.tar.xz"
+gcc_url: "https://ftp.gnu.org/gnu/gcc/gcc-{{ gcc_version }}/gcc-{{ gcc_version }}.tar.xz"
+gcc_make_jobs: "{{ ansible_facts['processor_vcpus'] | default(4) }}"
+gcc_disable_bootstrap: true
+
+# TrueNAS mounts used by the GPU development VM.
+smb_mounts:
+  - share: backup
+    path: /mnt/backup
+
+# Persistent VM -> GitHub identity.
+github_private_key_path: "{{ dev_home }}/.ssh/github_ed25519"
+github_public_key_path: "{{ dev_home }}/.ssh/github_ed25519.pub"
+github_populate_known_hosts: true
+
+# CUDA
+cuda_toolkit_version: "13-3"
+cuda_toolkit_package: "cuda-toolkit-{{ cuda_toolkit_version }}"
+cuda_keyring_version: "1.1-1"
+
+cuda_distro_map:
+  "22.04": "ubuntu2204"
+  "24.04": "ubuntu2404"
+  "26.04": "ubuntu2604"
+
+# JupyterLab
+jupyter_env_name: "jupyterlab"
+jupyter_env_path: "{{ miniconda_dir }}/envs/{{ jupyter_env_name }}"
+jupyter_port: 8888
+jupyter_root_dir: "{{ dev_home }}"

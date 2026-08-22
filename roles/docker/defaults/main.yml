@@ -1,0 +1,29 @@
+---
+docker_user: "{{ dev_user }}"
+
+docker_root_dir: "/srv/docker"
+
+docker_directories:
+  - "{{ docker_root_dir }}"
+  - "{{ docker_root_dir }}/appdata"
+  - "{{ docker_root_dir }}/compose"
+  - "{{ docker_root_dir }}/backup-staging"
+
+docker_apt_arch: "amd64"
+
+docker_packages:
+  - docker-ce
+  - docker-ce-cli
+  - containerd.io
+  - docker-buildx-plugin
+  - docker-compose-plugin
+
+docker_conflicting_packages:
+  - docker.io
+  - docker-compose
+  - docker-compose-v2
+  - docker-doc
+  - docker-buildx
+  - podman-docker
+  - containerd
+  - runc

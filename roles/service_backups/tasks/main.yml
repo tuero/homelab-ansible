@@ -1,0 +1,76 @@
+---
+- name: Install backup dependencies
+  ansible.builtin.apt:
+    name:
+      - rsync
+      - tar
+      - util-linux
+      - zstd
+    state: present
+    update_cache: true
+  become: true
+
+- name: Create local backup staging directory
+  ansible.builtin.file:
+    path: "{{ service_backup_staging_root }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  become: true
+
+- name: Trigger service-backups automount
+  ansible.builtin.command:
+    cmd: ls -ld "{{ service_backup_mount }}"
+  changed_when: false
+
+- name: Verify service-backups is mounted over CIFS
+  ansible.builtin.command:
+    cmd: findmnt -n -t cifs --target "{{ service_backup_mount }}"
+  changed_when: false
+
+- name: Create TrueNAS appdata backup root
+  ansible.builtin.file:
+    path: "{{ service_backup_destination }}"
+    state: directory
+    mode: "0700"
+  become: true
+
+- name: Install appdata backup script
+  ansible.builtin.template:
+    src: service-appdata-backup.j2
+    dest: /usr/local/sbin/service-appdata-backup
+    owner: root
+    group: root
+    mode: "0755"
+  become: true
+
+- name: Install appdata backup systemd service
+  ansible.builtin.template:
+    src: service-appdata-backup.service.j2
+    dest: /etc/systemd/system/service-appdata-backup.service
+    owner: root
+    group: root
+    mode: "0644"
+  become: true
+
+- name: Install appdata backup systemd timer
+  ansible.builtin.template:
+    src: service-appdata-backup.timer.j2
+    dest: /etc/systemd/system/service-appdata-backup.timer
+    owner: root
+    group: root
+    mode: "0644"
+  become: true
+
+- name: Reload systemd units
+  ansible.builtin.systemd_service:
+    daemon_reload: true
+  become: true
+
+- name: Enable and start appdata backup timer
+  ansible.builtin.systemd_service:
+    name: service-appdata-backup.timer
+    enabled: true
+    state: started
+  become: true

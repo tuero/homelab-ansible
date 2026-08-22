@@ -1,0 +1,205 @@
+---
+- name: Install GPU development packages
+  ansible.builtin.apt:
+    name: "{{ gpu_dev_packages }}"
+    state: present
+
+# ---------------- Rust ----------------
+
+- name: Check whether rustup is installed
+  ansible.builtin.stat:
+    path: "{{ dev_home }}/.cargo/bin/rustup"
+  register: rustup_binary
+
+- name: Download rustup installer
+  ansible.builtin.get_url:
+    url: https://sh.rustup.rs
+    dest: /tmp/rustup-init.sh
+    mode: "0755"
+  when: not rustup_binary.stat.exists
+
+- name: Install Rust for development user
+  ansible.builtin.command:
+    cmd: /tmp/rustup-init.sh -y
+  become_user: "{{ dev_user }}"
+  environment:
+    HOME: "{{ dev_home }}"
+  when: not rustup_binary.stat.exists
+
+# ---------------- CMake + Neovim ----------------
+
+- name: Remove Ubuntu CMake package because CMake will come from Snap
+  ansible.builtin.apt:
+    name: cmake
+    state: absent
+    purge: true
+
+- name: Check CMake snap
+  ansible.builtin.command: snap list cmake
+  register: cmake_snap
+  changed_when: false
+  failed_when: false
+
+- name: Install current CMake snap
+  ansible.builtin.command: snap install cmake --classic
+  when: cmake_snap.rc != 0
+
+- name: Check Neovim snap
+  ansible.builtin.command: snap list nvim
+  register: nvim_snap
+  changed_when: false
+  failed_when: false
+
+- name: Install current Neovim snap
+  ansible.builtin.command: snap install nvim --classic
+  when: nvim_snap.rc != 0
+
+# ---------------- LLVM ----------------
+
+- name: Check selected LLVM version
+  ansible.builtin.stat:
+    path: "/usr/bin/clang-{{ llvm_version }}"
+  register: llvm_binary
+
+- name: Download official apt.llvm.org installer
+  ansible.builtin.get_url:
+    url: https://apt.llvm.org/llvm.sh
+    dest: /tmp/llvm.sh
+    mode: "0755"
+  when: not llvm_binary.stat.exists
+
+- name: Install LLVM {{ llvm_version }}
+  ansible.builtin.command:
+    cmd: "/tmp/llvm.sh {{ llvm_version }}"
+  when: not llvm_binary.stat.exists
+
+- name: Install LLVM development tools
+  ansible.builtin.apt:
+    name:
+      - "clang-format-{{ llvm_version }}"
+      - "clangd-{{ llvm_version }}"
+      - "clang-tidy-{{ llvm_version }}"
+    state: present
+    update_cache: true
+
+# tree-sitter-cli requires the Rust toolchain and LLVM to be present first.
+- name: Install tree-sitter CLI through Cargo
+  ansible.builtin.command:
+    cmd: "{{ dev_home }}/.cargo/bin/cargo install --locked tree-sitter-cli"
+    creates: "{{ dev_home }}/.cargo/bin/tree-sitter"
+  become_user: "{{ dev_user }}"
+  environment:
+    HOME: "{{ dev_home }}"
+    PATH: "{{ dev_home }}/.cargo/bin:{{ ansible_facts['env']['PATH'] }}"
+
+# ---------------- Miniconda ----------------
+
+- name: Check whether Miniconda is installed
+  ansible.builtin.stat:
+    path: "{{ miniconda_dir }}/bin/conda"
+  register: conda_binary
+
+- name: Download Miniconda installer
+  ansible.builtin.get_url:
+    url: "{{ miniconda_url }}"
+    dest: /tmp/Miniconda3-latest-Linux-x86_64.sh
+    mode: "0755"
+  when: not conda_binary.stat.exists
+
+- name: Install Miniconda
+  ansible.builtin.command:
+    cmd: "/tmp/Miniconda3-latest-Linux-x86_64.sh -b -p {{ miniconda_dir }}"
+  become_user: "{{ dev_user }}"
+  environment:
+    HOME: "{{ dev_home }}"
+  when: not conda_binary.stat.exists
+
+- name: Check whether Conda initialized bash
+  ansible.builtin.command:
+    cmd: grep -q ">>> conda initialize >>>" "{{ dev_home }}/.bashrc"
+  register: conda_initialized
+  changed_when: false
+  failed_when: false
+
+- name: Initialize Conda for bash
+  ansible.builtin.command:
+    cmd: "{{ miniconda_dir }}/bin/conda init bash"
+  become_user: "{{ dev_user }}"
+  environment:
+    HOME: "{{ dev_home }}"
+  when: conda_initialized.rc != 0
+
+# ---------------- GCC 16.2 ----------------
+
+- name: Ensure GCC source directory parent exists
+  ansible.builtin.file:
+    path: /usr/local/src
+    state: directory
+    mode: "0755"
+
+- name: Check whether GCC {{ gcc_short_version }} is already installed
+  ansible.builtin.stat:
+    path: "/usr/local/bin/gcc-{{ gcc_short_version }}"
+  register: gcc_installed
+
+- name: Download GCC {{ gcc_version }} release source
+  ansible.builtin.get_url:
+    url: "{{ gcc_url }}"
+    dest: "{{ gcc_tarball }}"
+    mode: "0644"
+  when: not gcc_installed.stat.exists
+
+- name: Extract GCC source
+  ansible.builtin.unarchive:
+    src: "{{ gcc_tarball }}"
+    dest: /usr/local/src
+    remote_src: true
+    creates: "{{ gcc_src_dir }}/configure"
+  when: not gcc_installed.stat.exists
+
+- name: Download GCC prerequisite sources
+  ansible.builtin.shell: |
+    set -euo pipefail
+    ./contrib/download_prerequisites
+    touch .ansible-prerequisites-complete
+  args:
+    executable: /bin/bash
+    chdir: "{{ gcc_src_dir }}"
+    creates: "{{ gcc_src_dir }}/.ansible-prerequisites-complete"
+  when: not gcc_installed.stat.exists
+
+- name: Create out-of-tree GCC build directory
+  ansible.builtin.file:
+    path: "{{ gcc_build_dir }}"
+    state: directory
+    mode: "0755"
+  when: not gcc_installed.stat.exists
+
+- name: Configure GCC {{ gcc_version }}
+  ansible.builtin.command:
+    cmd: >-
+      {{ gcc_src_dir }}/configure
+      --prefix=/usr/local
+      --program-suffix=-{{ gcc_short_version }}
+      --disable-multilib
+      --enable-languages=c,c++,fortran
+      {{ '--disable-bootstrap' if gcc_disable_bootstrap else '' }}
+  args:
+    chdir: "{{ gcc_build_dir }}"
+    creates: "{{ gcc_build_dir }}/Makefile"
+  when: not gcc_installed.stat.exists
+
+- name: Build GCC {{ gcc_version }}
+  ansible.builtin.command:
+    cmd: "make -j{{ gcc_make_jobs }}"
+  args:
+    chdir: "{{ gcc_build_dir }}"
+  when: not gcc_installed.stat.exists
+
+- name: Install GCC {{ gcc_version }} side-by-side
+  ansible.builtin.command:
+    cmd: make install
+  args:
+    chdir: "{{ gcc_build_dir }}"
+    creates: "/usr/local/bin/gcc-{{ gcc_short_version }}"
+  when: not gcc_installed.stat.exists

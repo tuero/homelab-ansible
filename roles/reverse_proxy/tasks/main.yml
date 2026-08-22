@@ -1,0 +1,72 @@
+---
+- name: Require Cloudflare API token
+  ansible.builtin.assert:
+    that:
+      - vault_cloudflare_api_token is defined
+      - vault_cloudflare_api_token | length > 0
+    fail_msg: "Cloudflare API token must be defined in group_vars/all/vault.yml"
+  no_log: true
+
+- name: Create reverse proxy compose directory
+  ansible.builtin.file:
+    path: "{{ reverse_proxy_dir }}"
+    state: directory
+    owner: "{{ dev_user }}"
+    group: "{{ dev_user }}"
+    mode: "0755"
+
+- name: Create Caddy appdata directories
+  ansible.builtin.file:
+    path: "{{ reverse_proxy_appdata }}/{{ item }}"
+    state: directory
+    owner: "{{ dev_user }}"
+    group: "{{ dev_user }}"
+    mode: "0755"
+  loop:
+    - data
+    - config
+
+- name: Install Cloudflare environment file
+  ansible.builtin.template:
+    src: cloudflare.env.j2
+    dest: "{{ reverse_proxy_dir }}/cloudflare.env"
+    owner: "{{ dev_user }}"
+    group: "{{ dev_user }}"
+    mode: "0600"
+  no_log: true
+
+- name: Install Caddy Dockerfile
+  ansible.builtin.template:
+    src: Dockerfile.j2
+    dest: "{{ reverse_proxy_dir }}/Dockerfile"
+    owner: "{{ dev_user }}"
+    group: "{{ dev_user }}"
+    mode: "0644"
+  register: caddy_dockerfile
+
+- name: Install Caddy configuration
+  ansible.builtin.template:
+    src: Caddyfile.j2
+    dest: "{{ reverse_proxy_dir }}/Caddyfile"
+    owner: "{{ dev_user }}"
+    group: "{{ dev_user }}"
+    mode: "0644"
+  register: caddyfile_config
+
+- name: Install reverse proxy compose file
+  ansible.builtin.template:
+    src: compose.yml.j2
+    dest: "{{ reverse_proxy_dir }}/compose.yml"
+    owner: "{{ dev_user }}"
+    group: "{{ dev_user }}"
+    mode: "0644"
+
+- name: Deploy reverse proxy
+  community.docker.docker_compose_v2:
+    project_src: "{{ reverse_proxy_dir }}"
+    state: present
+    remove_orphans: true
+    build: "{{ 'always' if caddy_dockerfile.changed else 'policy' }}"
+    # The Caddyfile is a single-file bind mount. Ansible replaces templates
+    # atomically, so Caddy must be recreated to mount the replacement inode.
+    recreate: "{{ 'always' if caddyfile_config.changed else 'auto' }}"

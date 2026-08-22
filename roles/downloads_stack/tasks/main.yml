@@ -1,0 +1,82 @@
+---
+- name: Require PIA credentials
+  ansible.builtin.assert:
+    that:
+      - vault_pia_username is defined
+      - vault_pia_username | length > 0
+      - vault_pia_password is defined
+      - vault_pia_password | length > 0
+    fail_msg: "PIA credentials must be defined in group_vars/all/vault.yml"
+  no_log: true
+
+- name: Trigger TrueNAS media automount
+  ansible.builtin.command:
+    cmd: ls -ld /mnt/media
+  changed_when: false
+
+- name: Verify media storage is mounted over CIFS
+  ansible.builtin.command:
+    cmd: findmnt -n -t cifs --target /mnt/media
+  changed_when: false
+
+- name: Get service user UID
+  ansible.builtin.command:
+    cmd: "id -u {{ dev_user }}"
+  register: downloads_uid
+  changed_when: false
+
+- name: Get service user GID
+  ansible.builtin.command:
+    cmd: "id -g {{ dev_user }}"
+  register: downloads_gid
+  changed_when: false
+
+- name: Create downloads compose directory
+  ansible.builtin.file:
+    path: "{{ downloads_stack_dir }}"
+    state: directory
+    owner: "{{ dev_user }}"
+    group: "{{ dev_user }}"
+    mode: "0755"
+
+- name: Create downloads application-data directories
+  ansible.builtin.file:
+    path: "{{ downloads_appdata_root }}/{{ item }}"
+    state: directory
+    owner: "{{ dev_user }}"
+    group: "{{ dev_user }}"
+    mode: "0755"
+  loop:
+    - gluetun
+    - qbittorrent
+
+- name: Remove legacy downloads environment files
+  ansible.builtin.file:
+    path: "{{ downloads_stack_dir }}/{{ item }}"
+    state: absent
+  loop:
+    - .env
+    - privatevpn.env
+
+- name: Install PIA environment file
+  ansible.builtin.template:
+    src: pia.env.j2
+    dest: "{{ downloads_stack_dir }}/pia.env"
+    owner: "{{ dev_user }}"
+    group: "{{ dev_user }}"
+    mode: "0600"
+  no_log: true
+
+- name: Install downloads compose file
+  ansible.builtin.template:
+    src: compose.yml.j2
+    dest: "{{ downloads_stack_dir }}/compose.yml"
+    owner: "{{ dev_user }}"
+    group: "{{ dev_user }}"
+    mode: "0644"
+
+- name: Deploy downloads stack
+  community.docker.docker_compose_v2:
+    project_src: "{{ downloads_stack_dir }}"
+    state: present
+    remove_orphans: true

@@ -1,0 +1,74 @@
+---
+- name: Require Ubuntu
+  ansible.builtin.assert:
+    that:
+      - ansible_facts["distribution"] == "Ubuntu"
+    fail_msg: "This playbook currently targets Ubuntu."
+
+- name: Update apt cache and upgrade installed packages
+  ansible.builtin.apt:
+    update_cache: true
+    cache_valid_time: 3600
+    upgrade: dist
+
+- name: Read configured system timezone
+  ansible.builtin.command:
+    cmd: timedatectl show --property=Timezone --value
+  register: common_current_timezone
+  changed_when: false
+  check_mode: false
+
+- name: Set system timezone
+  ansible.builtin.command:
+    cmd: "timedatectl set-timezone {{ timezone }}"
+  when: common_current_timezone.stdout != timezone
+
+- name: Install common packages
+  ansible.builtin.apt:
+    name: "{{ common_packages }}"
+    state: present
+
+- name: Ensure qemu-guest-agent is installed
+  ansible.builtin.apt:
+    name: qemu-guest-agent
+    state: present
+
+- name: Enable qemu-guest-agent
+  ansible.builtin.systemd:
+    name: qemu-guest-agent
+    enabled: true
+    state: started
+
+- name: Ensure X11 forwarding is enabled in sshd
+  ansible.builtin.copy:
+    dest: /etc/ssh/sshd_config.d/99-x11-forwarding.conf
+    mode: "0644"
+    content: |
+      X11Forwarding yes
+  notify: Restart ssh
+  when: enable_x11_forwarding | bool
+
+- name: Remove Ansible X11 forwarding override when disabled
+  ansible.builtin.file:
+    path: /etc/ssh/sshd_config.d/99-x11-forwarding.conf
+    state: absent
+  notify: Restart ssh
+  when: not (enable_x11_forwarding | bool)
+
+- name: Add additional inbound SSH public keys
+  ansible.posix.authorized_key:
+    user: "{{ dev_user }}"
+    key: "{{ item }}"
+    state: present
+  loop: "{{ inbound_ssh_public_keys }}"
+  when: inbound_ssh_public_keys | length > 0
+
+- name: Check whether an OS upgrade requires reboot
+  ansible.builtin.stat:
+    path: /var/run/reboot-required
+  register: common_reboot_required
+
+- name: Reboot after OS upgrade when required
+  ansible.builtin.reboot:
+    reboot_timeout: 900
+  when: common_reboot_required.stat.exists

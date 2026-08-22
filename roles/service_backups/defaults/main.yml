@@ -1,0 +1,39 @@
+---
+service_backup_appdata_root: "/srv/docker/appdata"
+service_backup_staging_root: "/srv/docker/backup-staging/appdata"
+
+service_backup_mount: "/mnt/service-backups"
+service_backup_node_name: "ardougne"
+service_backup_destination: >-
+  {{ service_backup_mount }}/{{ service_backup_node_name }}/appdata
+
+service_backup_current_dir: "{{ service_backup_destination }}/current"
+service_backup_archive_name: "appdata.tar.zst"
+service_backup_checksum_name: "appdata.tar.zst.sha256"
+service_backup_manifest_name: "manifest.yml"
+service_backup_success_name: "success.yml"
+service_backup_lock_file: "/run/lock/service-appdata-backup.lock"
+
+# These directories must exist in a recoverable services backup. Add future
+# stateful services here when their appdata is added to the backup contract.
+service_backup_expected_directories:
+  - radarr
+  - sonarr
+  - bazarr
+  - prowlarr
+  - gluetun
+  - qbittorrent
+  - caddy
+  - homepage
+  - uptime-kuma
+
+# Stacks that must be quiesced while their appdata is copied locally.
+# Add future stateful stacks here.
+service_backup_compose_projects:
+  - "/srv/docker/compose/arr"
+  - "/srv/docker/compose/downloads"
+  - "/srv/docker/compose/reverse-proxy"
+  - "/srv/docker/compose/monitoring"
+
+# Daily at 4:30 AM, using the timezone configured by the common role.
+service_backup_on_calendar: "*-*-* 04:30:00"

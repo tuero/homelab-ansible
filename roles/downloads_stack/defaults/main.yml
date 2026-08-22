@@ -1,0 +1,10 @@
+---
+downloads_stack_dir: "/srv/docker/compose/downloads"
+downloads_appdata_root: "/srv/docker/appdata"
+
+gluetun_image: "qmcgaw/gluetun:v3.41.3"
+qbittorrent_image: "lscr.io/linuxserver/qbittorrent:latest"
+
+downloads_timezone: "America/Toronto"
+
+qbittorrent_webui_port: 8080

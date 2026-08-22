@@ -1,0 +1,80 @@
+---
+- Systems:
+    - Varrock:
+        icon: jupyter.png
+        href: https://jupyter.tuerolab.ca
+        description: "10.0.0.111 | GPU development, CUDA, JupyterLab"
+    - Lumbridge:
+        icon: adguard-home.png
+        href: https://adguard.tuerolab.ca
+        description: "10.0.0.112 | AdGuard DNS, Tailscale router, exit node"
+    - Ardougne:
+        icon: homepage.png
+        href: https://homepage.tuerolab.ca
+        description: "10.0.0.113 | Docker, Caddy, media services, monitoring"
+    - Falador:
+        icon: truenas.png
+        href: https://truenas.tuerolab.ca
+        description: "10.0.0.234 | TrueNAS storage, backups, SMB shares"
+
+- Monitoring:
+    - Homepage:
+        icon: homepage.png
+        href: "https://{{ homepage_host }}"
+        description: Service dashboard
+        siteMonitor: http://homepage:3000
+    - Uptime Kuma:
+        icon: uptime-kuma.png
+        href: "https://{{ uptime_kuma_host }}"
+        description: Health checks and notifications
+        siteMonitor: http://uptime-kuma:3001
+    - Caddy:
+        icon: caddy.png
+        description: HTTPS reverse proxy
+
+- Infrastructure:
+    - TrueNAS:
+        icon: truenas.png
+        href: "https://truenas.tuerolab.ca"
+        description: Storage on Falador
+        siteMonitor: http://10.0.0.234:81
+    - AdGuard Home:
+        icon: adguard-home.png
+        href: "https://adguard.tuerolab.ca"
+        description: DNS and internal rewrites on Lumbridge
+        siteMonitor: http://10.0.0.112:3001
+    - JupyterLab:
+        icon: jupyter.png
+        href: "https://jupyter.tuerolab.ca"
+        description: GPU development environment
+        siteMonitor: http://10.0.0.111:8888
+
+- Media:
+    - Radarr:
+        icon: radarr.png
+        href: "https://radarr.tuerolab.ca"
+        description: Movies
+        siteMonitor: http://radarr:7878
+    - Sonarr:
+        icon: sonarr.png
+        href: "https://sonarr.tuerolab.ca"
+        description: TV and anime
+        siteMonitor: http://sonarr:8989
+    - Bazarr:
+        icon: bazarr.png
+        href: "https://bazarr.tuerolab.ca"
+        description: Subtitles
+        siteMonitor: http://bazarr:6767
+    - Prowlarr:
+        icon: prowlarr.png
+        href: "https://prowlarr.tuerolab.ca"
+        description: Indexers
+        siteMonitor: http://prowlarr:9696
+    - qBittorrent:
+        icon: qbittorrent.png
+        href: "https://qbittorrent.tuerolab.ca"
+        description: Downloads through Gluetun
+        siteMonitor: http://host.docker.internal:8080
+    - Gluetun:
+        icon: gluetun.png
+        description: VPN network namespace

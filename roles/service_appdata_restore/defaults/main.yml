@@ -1,0 +1,33 @@
+---
+# This role is intentionally opt-in and only supports restoring a fresh
+# services VM. It never merges with or replaces existing appdata.
+service_restore_enabled: false
+service_restore_confirmation: ""
+service_restore_required_confirmation: "RESTORE_ardougne_TO_services"
+
+service_restore_mount: "/mnt/service-backups"
+service_restore_node_name: "ardougne"
+service_restore_root: >-
+  {{ service_restore_mount }}/{{ service_restore_node_name }}/appdata
+service_restore_source: "{{ service_restore_root }}/current"
+service_restore_archive_name: "appdata.tar.zst"
+service_restore_checksum_name: "appdata.tar.zst.sha256"
+service_restore_manifest_name: "manifest.yml"
+service_restore_success_name: "success.yml"
+service_restore_success_marker: "{{ service_restore_source }}/{{ service_restore_success_name }}"
+
+service_restore_parent: "/srv/docker"
+service_restore_target: "{{ service_restore_parent }}/appdata"
+service_restore_marker: "{{ service_restore_parent }}/.last-appdata-restore.yml"
+service_restore_free_space_reserve_bytes: 1073741824
+
+service_restore_expected_directories:
+  - radarr
+  - sonarr
+  - bazarr
+  - prowlarr
+  - gluetun
+  - qbittorrent
+  - caddy
+  - homepage
+  - uptime-kuma

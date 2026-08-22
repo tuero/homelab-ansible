@@ -1,0 +1,53 @@
+---
+reverse_proxy_dir: "/srv/docker/compose/reverse-proxy"
+reverse_proxy_appdata: "/srv/docker/appdata/caddy"
+
+reverse_proxy_network: "{{ docker_proxy_network | default('proxy') }}"
+
+caddy_version: "2.11.4"
+caddy_image: "tuerolab-caddy:2.11.4-cloudflare"
+
+reverse_proxy_routes:
+  # TrueNAS stays directly reachable as Falador; this is its clean UI URL.
+  - host: "truenas.tuerolab.ca"
+    upstream: "10.0.0.234:81"
+    allowed_networks:
+      - "10.0.0.0/24"
+      - "100.64.0.0/10"
+
+  - host: "homepage.tuerolab.ca"
+    upstream: "homepage:3000"
+    allowed_networks:
+      - "10.0.0.0/24"
+      - "100.64.0.0/10"
+
+  - host: "status.tuerolab.ca"
+    upstream: "uptime-kuma:3001"
+    allowed_networks:
+      - "10.0.0.0/24"
+      - "100.64.0.0/10"
+
+  # JupyterLab runs on Varrock rather than the Docker host.
+  - host: "jupyter.tuerolab.ca"
+    upstream: "10.0.0.111:8888"
+
+  # AdGuard runs on Lumbridge rather than the Docker host.
+  - host: "adguard.tuerolab.ca"
+    upstream: "10.0.0.112:3001"
+
+  - host: "radarr.tuerolab.ca"
+    upstream: "radarr:7878"
+
+  - host: "sonarr.tuerolab.ca"
+    upstream: "sonarr:8989"
+
+  - host: "bazarr.tuerolab.ca"
+    upstream: "bazarr:6767"
+
+  - host: "prowlarr.tuerolab.ca"
+    upstream: "prowlarr:9696"
+
+  # qBittorrent deliberately stays behind Gluetun.
+  # Caddy reaches its host-published Web UI instead.
+  - host: "qbittorrent.tuerolab.ca"
+    upstream: "host.docker.internal:8080"

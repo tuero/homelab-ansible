@@ -1,0 +1,67 @@
+---
+# -----------------------------------------------------------------------------
+# Tailscale
+# -----------------------------------------------------------------------------
+
+# Make the homelab LAN reachable from devices connected to the tailnet.
+tailscale_advertise_routes: "10.0.0.0/24"
+
+# Allow this VM to be selected as a Tailscale exit node.
+tailscale_advertise_exit_node: true
+
+
+# -----------------------------------------------------------------------------
+# AdGuard Home
+# -----------------------------------------------------------------------------
+
+adguardhome_bind_ip: "10.0.0.112"
+adguardhome_admin_username: "tuero"
+
+adguardhome_dns_rewrites:
+
+  # TrueNAS
+  - domain: "falador.tuerolab.ca"
+    answer: "10.0.0.234"
+
+  # GPU / deep-learning server
+  - domain: "varrock.tuerolab.ca"
+    answer: "10.0.0.111"
+
+  # Infrastructure server
+  - domain: "lumbridge.tuerolab.ca"
+    answer: "10.0.0.112"
+
+  # Docker / services server
+  - domain: "ardougne.tuerolab.ca"
+    answer: "10.0.0.113"
+
+  # Services behind Caddy
+  - domain: "truenas.tuerolab.ca"
+    answer: "10.0.0.113"
+
+  - domain: "homepage.tuerolab.ca"
+    answer: "10.0.0.113"
+
+  - domain: "status.tuerolab.ca"
+    answer: "10.0.0.113"
+
+  - domain: "jupyter.tuerolab.ca"
+    answer: "10.0.0.113"
+
+  - domain: "adguard.tuerolab.ca"
+    answer: "10.0.0.113"
+
+  - domain: "radarr.tuerolab.ca"
+    answer: "10.0.0.113"
+
+  - domain: "sonarr.tuerolab.ca"
+    answer: "10.0.0.113"
+
+  - domain: "bazarr.tuerolab.ca"
+    answer: "10.0.0.113"
+
+  - domain: "prowlarr.tuerolab.ca"
+    answer: "10.0.0.113"
+
+  - domain: "qbittorrent.tuerolab.ca"
+    answer: "10.0.0.113"

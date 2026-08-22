@@ -1,0 +1,131 @@
+---
+- name: Check whether AdGuard Home is installed
+  ansible.builtin.stat:
+    path: "{{ adguardhome_install_dir }}/AdGuardHome"
+  register: adguardhome_binary
+
+- name: Download AdGuard Home
+  ansible.builtin.get_url:
+    url: >-
+      https://github.com/AdguardTeam/AdGuardHome/releases/download/{{
+      adguardhome_version }}/AdGuardHome_linux_{{
+      adguardhome_arch }}.tar.gz
+    dest: "{{ adguardhome_archive }}"
+    mode: "0644"
+  when: not adguardhome_binary.stat.exists
+
+- name: Extract AdGuard Home
+  ansible.builtin.unarchive:
+    src: "{{ adguardhome_archive }}"
+    dest: "/opt"
+    remote_src: true
+  when: not adguardhome_binary.stat.exists
+
+- name: Check whether AdGuard Home systemd service exists
+  ansible.builtin.stat:
+    path: /etc/systemd/system/AdGuardHome.service
+  register: adguardhome_service
+
+- name: Install AdGuard Home systemd service
+  ansible.builtin.command:
+    cmd: ./AdGuardHome -s install
+    chdir: "{{ adguardhome_install_dir }}"
+  when: not adguardhome_service.stat.exists
+
+- name: Ensure AdGuard Home is enabled and running
+  ansible.builtin.systemd:
+    name: AdGuardHome
+    enabled: true
+    state: started
+    daemon_reload: true
+
+- name: Check whether AdGuard Home has completed initial setup
+  ansible.builtin.stat:
+    path: "{{ adguardhome_config_file }}"
+  register: adguardhome_config
+
+#
+# First-time configuration
+#
+
+- name: Wait for AdGuard Home installation wizard
+  ansible.builtin.wait_for:
+    host: "{{ adguardhome_bind_ip }}"
+    port: "{{ adguardhome_setup_port }}"
+    timeout: 30
+  when: not adguardhome_config.stat.exists
+
+- name: Perform initial AdGuard Home configuration
+  ansible.builtin.uri:
+    url: >-
+      http://{{ adguardhome_bind_ip }}:{{
+      adguardhome_setup_port }}/control/install/configure
+    method: POST
+    body_format: json
+    body:
+      web:
+        ip: "{{ adguardhome_bind_ip }}"
+        port: "{{ adguardhome_web_port }}"
+      dns:
+        ip: "{{ adguardhome_bind_ip }}"
+        port: "{{ adguardhome_dns_port }}"
+      username: "{{ adguardhome_admin_username }}"
+      password: "{{ vault_adguard_password }}"
+    status_code: 200
+    return_content: true
+  when: not adguardhome_config.stat.exists
+  no_log: true
+
+#
+# Normal running service
+#
+
+- name: Wait for AdGuard Home web interface
+  ansible.builtin.wait_for:
+    host: "{{ adguardhome_bind_ip }}"
+    port: "{{ adguardhome_web_port }}"
+    timeout: 30
+
+- name: Wait for AdGuard Home DNS service
+  ansible.builtin.wait_for:
+    host: "{{ adguardhome_bind_ip }}"
+    port: "{{ adguardhome_dns_port }}"
+    timeout: 30
+
+#
+# DNS rewrites
+#
+
+- name: Build Ansible-managed DNS rewrite rules
+  ansible.builtin.set_fact:
+    adguardhome_rendered_rules: []
+
+- name: Add DNS rewrites to rule list
+  ansible.builtin.set_fact:
+    adguardhome_rendered_rules: >-
+      {{
+        adguardhome_rendered_rules
+        +
+        [
+          '||'
+          ~ item.domain
+          ~ '^$dnsrewrite=NOERROR;A;'
+          ~ item.answer
+        ]
+      }}
+  loop: "{{ adguardhome_dns_rewrites }}"
+
+- name: Apply Ansible-managed DNS rewrite rules
+  ansible.builtin.uri:
+    url: >-
+      http://{{ adguardhome_bind_ip }}:{{
+      adguardhome_web_port }}/control/filtering/set_rules
+    method: POST
+    user: "{{ adguardhome_admin_username }}"
+    password: "{{ vault_adguard_password }}"
+    force_basic_auth: true
+    body_format: json
+    body:
+      rules: "{{ adguardhome_rendered_rules }}"
+    status_code: 200
+  no_log: true

@@ -1,0 +1,43 @@
+---
+# Primary Linux account created by Proxmox Cloud-Init on every managed VM.
+dev_user: tuero
+dev_home: "/home/{{ dev_user }}"
+
+timezone: America/Toronto
+
+# Public keys that are allowed to SSH INTO every managed VM.
+# The controller's key should already be supplied through Cloud-Init so
+# Ansible can make its first connection.
+inbound_ssh_public_keys:
+  - "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIK3isfSQVZ7YnrJit6O482VDy84JGcnh6HAovdzRWQwe windows11-workstation"
+
+# Small package set appropriate for every Ubuntu VM. Development-only
+# packages stay in group_vars/gpu_servers/vars.yml.
+common_packages:
+  - ca-certificates
+  - curl
+  - git
+  - gnupg
+  - htop
+  - python3
+  - python3-pip
+  - python3-venv
+  - tar
+  - tmux
+  - unzip
+  - vim
+  - wget
+  - xz-utils
+  - zip
+  - zstd
+
+# X11 forwarding is useful on the GPU development VM but unnecessary on the
+# infrastructure and services VMs. The GPU group overrides this to true.
+enable_x11_forwarding: false
+
+# Shared TrueNAS connection defaults. Only roles/hosts that use the
+# truenas_mounts role will actually mount anything.
+truenas_server: "10.0.0.234"
+truenas_smb_username: "tuero"
+truenas_smb_version: "3.1.1"
+truenas_credentials_file: "/etc/samba/credentials/truenas"

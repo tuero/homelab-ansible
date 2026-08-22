@@ -1,0 +1,80 @@
+---
+- name: Check whether JupyterLab environment exists
+  ansible.builtin.stat:
+    path: "{{ jupyter_env_path }}/bin/jupyter"
+  register: jupyter_binary
+
+- name: Create dedicated JupyterLab Conda environment
+  ansible.builtin.command:
+    cmd: >-
+      {{ miniconda_dir }}/bin/conda create
+      --override-channels
+      -c conda-forge
+      -n {{ jupyter_env_name }}
+      -y
+      python=3.12
+      jupyterlab
+      ipykernel
+  become_user: "{{ dev_user }}"
+  environment:
+    HOME: "{{ dev_home }}"
+  when: not jupyter_binary.stat.exists
+
+- name: Ensure Jupyter configuration directory exists
+  ansible.builtin.file:
+    path: "{{ dev_home }}/.jupyter"
+    state: directory
+    owner: "{{ dev_user }}"
+    group: "{{ dev_user }}"
+    mode: "0700"
+
+- name: Create Jupyter Server configuration
+  ansible.builtin.copy:
+    dest: "{{ dev_home }}/.jupyter/jupyter_server_config.py"
+    owner: "{{ dev_user }}"
+    group: "{{ dev_user }}"
+    mode: "0600"
+    content: |
+      c.ServerApp.ip = "0.0.0.0"
+      c.ServerApp.port = {{ jupyter_port }}
+      c.ServerApp.port_retries = 0
+      c.ServerApp.open_browser = False
+      c.ServerApp.root_dir = "{{ jupyter_root_dir }}"
+      c.PasswordIdentityProvider.hashed_password = "{{ vault_jupyter_password_hash }}"
+  no_log: true
+  notify: Restart JupyterLab
+
+- name: Create JupyterLab systemd service
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/jupyterlab.service
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      [Unit]
+      Description=JupyterLab
+      After=network-online.target
+      Wants=network-online.target
+
+      [Service]
+      Type=simple
+      User={{ dev_user }}
+      Group={{ dev_user }}
+      WorkingDirectory={{ dev_home }}
+      Environment=HOME={{ dev_home }}
+      ExecStart={{ jupyter_env_path }}/bin/jupyter lab
+      Restart=on-failure
+      RestartSec=5
+
+      [Install]
+      WantedBy=multi-user.target
+  notify:
+    - Reload systemd
+    - Restart JupyterLab
+
+- name: Enable and start JupyterLab
+  ansible.builtin.systemd:
+    name: jupyterlab
+    enabled: true
+    state: started
+    daemon_reload: true

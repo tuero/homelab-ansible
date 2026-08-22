@@ -1,0 +1,6 @@
+---
+# GitHub publishes its SSH host keys so clients can populate known_hosts
+# without relying on trust-on-first-use or a live ssh-keyscan.
+github_host: "github.com"
+github_ed25519_host_key: >-
+  ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl

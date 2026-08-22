@@ -1,0 +1,22 @@
+---
+adguardhome_version: "v0.107.78"
+adguardhome_arch: "amd64"
+
+adguardhome_install_dir: "/opt/AdGuardHome"
+adguardhome_archive: "/tmp/AdGuardHome.tar.gz"
+adguardhome_config_file: "{{ adguardhome_install_dir }}/AdGuardHome.yaml"
+
+adguardhome_bind_ip: "10.0.0.112"
+
+# AdGuard's temporary first-run installation wizard.
+adguardhome_setup_port: 3000
+
+# Permanent admin UI.
+# Caddy will eventually proxy adguard.tuerolab.ca to this.
+adguardhome_web_port: 3001
+
+adguardhome_dns_port: 53
+
+adguardhome_admin_username: "tuero"
+
+adguardhome_dns_rewrites: []

@@ -1,0 +1,82 @@
+---
+# Common/base configuration for every managed Ubuntu VM.
+- name: Provision common Ubuntu base on homelab VMs
+  hosts: all
+  gather_facts: true
+  become: true
+
+  roles:
+    - role: common
+      tags: [common]
+
+# GPU/development-specific configuration. The common role is not repeated here;
+# the GPU host already receives it from the play above.
+- name: Provision Ubuntu GPU development server
+  hosts: gpu_servers
+  gather_facts: true
+  become: true
+
+  roles:
+    - role: dev_tools
+      tags: [dev]
+
+    - role: truenas_mounts
+      tags: [storage]
+
+    - role: github_ssh
+      tags: [github]
+
+    - role: nvidia_cuda
+      tags: [nvidia, cuda]
+
+    - role: jupyter
+      tags: [jupyter]
+
+    - role: post_install
+      tags: [post]
+
+# Infrastructure server configuration.
+- name: Provision homelab infrastructure server
+  hosts: infra_servers
+  gather_facts: true
+  become: true
+
+  roles:
+    - role: tailscale
+      tags: [tailscale]
+
+    - role: adguard
+      tags: [adguard, dns]
+
+# Services server configuration.
+- name: Provision homelab services server
+  hosts: services_servers
+  gather_facts: true
+  become: true
+
+  roles:
+    - role: truenas_mounts
+      tags: [storage]
+
+    # Recovery-only. This role is skipped unless --tags restore is specified.
+    # It must run before Docker or any Compose role can initialize appdata.
+    - role: service_appdata_restore
+      tags: [never, restore]
+
+    - role: docker
+      tags: [docker, services]
+
+    - role: arr_stack
+      tags: [arr, services]
+
+    - role: downloads_stack
+      tags: [downloads, services]
+
+    - role: reverse_proxy
+      tags: [proxy, services]
+
+    - role: monitoring_stack
+      tags: [monitoring, services]
+
+    - role: service_backups
+      tags: [backups, services]

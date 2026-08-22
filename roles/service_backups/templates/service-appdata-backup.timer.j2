@@ -1,0 +1,10 @@
+[Unit]
+Description=Daily Docker application-data backup
+
+[Timer]
+OnCalendar={{ service_backup_on_calendar }}
+Persistent=true
+Unit=service-appdata-backup.service
+
+[Install]
+WantedBy=timers.target

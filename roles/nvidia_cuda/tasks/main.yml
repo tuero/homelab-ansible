@@ -1,0 +1,79 @@
+---
+- name: Require an NVIDIA-supported Ubuntu version for this CUDA configuration
+  ansible.builtin.assert:
+    that:
+      - ansible_facts["distribution"] == "Ubuntu"
+      - ansible_facts["distribution_version"] in cuda_distro_map
+    fail_msg: >-
+      Ubuntu {{ ansible_facts["distribution_version"] }} is not listed in cuda_distro_map.
+      Before adding a new Ubuntu release, verify that the current CUDA toolkit
+      officially supports it and then add its NVIDIA repository identifier.
+
+- name: Set CUDA repository distribution
+  ansible.builtin.set_fact:
+    cuda_repo_distro: "{{ cuda_distro_map[ansible_facts['distribution_version']] }}"
+
+- name: Install NVIDIA driver helper and kernel headers
+  ansible.builtin.apt:
+    name:
+      - ubuntu-drivers-common
+      - linux-headers-generic
+    state: present
+    update_cache: true
+
+- name: Check whether NVIDIA driver is already functional
+  ansible.builtin.command: nvidia-smi
+  register: nvidia_smi_before
+  changed_when: false
+  failed_when: false
+
+- name: Install Ubuntu-recommended NVIDIA driver
+  ansible.builtin.command: ubuntu-drivers install
+  register: nvidia_driver_install
+  when: nvidia_smi_before.rc != 0
+
+- name: Reboot after installing NVIDIA driver
+  ansible.builtin.reboot:
+    reboot_timeout: 900
+  when:
+    - nvidia_smi_before.rc != 0
+    - nvidia_driver_install.changed | default(false)
+
+- name: Verify NVIDIA driver after reboot
+  ansible.builtin.command: nvidia-smi
+  changed_when: false
+
+- name: Download NVIDIA CUDA repository keyring
+  ansible.builtin.get_url:
+    url: >-
+      https://developer.download.nvidia.com/compute/cuda/repos/{{ cuda_repo_distro }}/x86_64/cuda-keyring_{{ cuda_keyring_version }}_all.deb
+    dest: "/tmp/cuda-keyring_{{ cuda_keyring_version }}_all.deb"
+    mode: "0644"
+
+- name: Install NVIDIA CUDA repository keyring
+  ansible.builtin.apt:
+    deb: "/tmp/cuda-keyring_{{ cuda_keyring_version }}_all.deb"
+
+- name: Install CUDA toolkit including nvcc
+  ansible.builtin.apt:
+    name: "{{ cuda_toolkit_package }}"
+    state: present
+    update_cache: true
+
+- name: Add CUDA to interactive shell PATH
+  ansible.builtin.copy:
+    dest: /etc/profile.d/cuda.sh
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      if [ -d /usr/local/cuda/bin ]; then
+          export PATH=/usr/local/cuda/bin:$PATH
+      fi
+      if [ -d /usr/local/cuda/lib64 ]; then
+          export LD_LIBRARY_PATH=/usr/local/cuda/lib64${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}
+      fi
+
+- name: Verify nvcc
+  ansible.builtin.command: /usr/local/cuda/bin/nvcc --version
+  changed_when: false

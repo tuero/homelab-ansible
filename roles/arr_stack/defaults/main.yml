@@ -1,0 +1,13 @@
+---
+arr_stack_dir: "/srv/docker/compose/arr"
+
+arr_appdata_root: "/srv/docker/appdata"
+arr_proxy_network: "{{ docker_proxy_network | default('proxy') }}"
+
+arr_timezone: "America/Toronto"
+
+arr_images:
+  radarr: "lscr.io/linuxserver/radarr:latest"
+  sonarr: "lscr.io/linuxserver/sonarr:latest"
+  bazarr: "lscr.io/linuxserver/bazarr:latest"
+  prowlarr: "lscr.io/linuxserver/prowlarr:latest"

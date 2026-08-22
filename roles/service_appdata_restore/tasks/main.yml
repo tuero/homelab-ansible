@@ -1,0 +1,356 @@
+---
+- name: Require explicit appdata restore authorization
+  ansible.builtin.assert:
+    that:
+      - service_restore_enabled | bool
+      - service_restore_confirmation == service_restore_required_confirmation
+    fail_msg: >-
+      Appdata restore is disabled. Run only for a fresh services VM with
+      --tags restore -e service_restore_enabled=true and the required
+      service_restore_confirmation value.
+
+- name: Require the approved services appdata paths
+  ansible.builtin.assert:
+    that:
+      - service_restore_mount == '/mnt/service-backups'
+      - service_restore_target == '/srv/docker/appdata'
+      - service_restore_source == '/mnt/service-backups/ardougne/appdata/current'
+      - service_restore_parent == '/srv/docker'
+    fail_msg: >-
+      Restore paths differ from the approved fresh-VM recovery paths. Refuse
+      to continue until the restore role is deliberately extended.
+
+- name: Install restore dependencies
+  ansible.builtin.apt:
+    name:
+      - tar
+      - zstd
+    state: present
+    update_cache: true
+
+- name: Trigger service-backups automount
+  ansible.builtin.command:
+    cmd: "ls -ld {{ service_restore_mount }}"
+  changed_when: false
+  check_mode: false
+
+- name: Verify service-backups is mounted over CIFS
+  ansible.builtin.command:
+    cmd: "findmnt -n -t cifs --target {{ service_restore_mount }}"
+  changed_when: false
+  check_mode: false
+
+- name: Check the published backup files
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  loop:
+    - "{{ service_restore_source }}"
+    - "{{ service_restore_source }}/{{ service_restore_archive_name }}"
+    - "{{ service_restore_source }}/{{ service_restore_checksum_name }}"
+    - "{{ service_restore_source }}/{{ service_restore_manifest_name }}"
+    - "{{ service_restore_success_marker }}"
+  register: service_restore_backup_files
+
+- name: Require a complete published backup
+  ansible.builtin.assert:
+    that:
+      - service_restore_backup_files.results[0].stat.isdir | default(false)
+      - service_restore_backup_files.results[1].stat.isreg | default(false)
+      - service_restore_backup_files.results[2].stat.isreg | default(false)
+      - service_restore_backup_files.results[3].stat.isreg | default(false)
+      - service_restore_backup_files.results[4].stat.isreg | default(false)
+    fail_msg: >-
+      The published appdata backup is incomplete. Refusing to restore from an
+      unverified or partially uploaded archive.
+
+- name: Verify published appdata archive checksum
+  ansible.builtin.command:
+    cmd: "sha256sum --check {{ service_restore_checksum_name }}"
+    chdir: "{{ service_restore_source }}"
+  changed_when: false
+  check_mode: false
+
+- name: Read successful backup marker
+  ansible.builtin.command:
+    cmd: "cat {{ service_restore_success_marker }}"
+  register: service_restore_success_marker_content
+  changed_when: false
+  check_mode: false
+
+- name: Read published archive checksum
+  ansible.builtin.command:
+    cmd: "sha256sum {{ service_restore_archive_name }}"
+    chdir: "{{ service_restore_source }}"
+  register: service_restore_archive_checksum
+  changed_when: false
+  check_mode: false
+
+- name: Read published manifest identity
+  ansible.builtin.command:
+    cmd: >-
+      awk -F': ' '/^(backup_id|source_host|archive|archive_sha256): /
+      { print $1 "=" $2 }' {{ service_restore_manifest_name }}
+    chdir: "{{ service_restore_source }}"
+  register: service_restore_manifest_identity
+  changed_when: false
+  check_mode: false
+
+- name: Read published success identity
+  ansible.builtin.command:
+    cmd: >-
+      awk -F': ' '/^(backup_id|archive_sha256): /
+      { print $1 "=" $2 }' {{ service_restore_success_name }}
+    chdir: "{{ service_restore_source }}"
+  register: service_restore_success_identity
+  changed_when: false
+  check_mode: false
+
+- name: Build published backup identity facts
+  ansible.builtin.set_fact:
+    service_restore_manifest_backup_id: >-
+      {{ (service_restore_manifest_identity.stdout_lines | select('match', '^backup_id=') | first | default('backup_id=')) | regex_replace('^backup_id=', '') }}
+    service_restore_manifest_source_host: >-
+      {{ (service_restore_manifest_identity.stdout_lines | select('match', '^source_host=') | first | default('source_host=')) | regex_replace('^source_host=', '') }}
+    service_restore_manifest_archive: >-
+      {{ (service_restore_manifest_identity.stdout_lines | select('match', '^archive=') | first | default('archive=')) | regex_replace('^archive=', '') }}
+    service_restore_manifest_archive_sha256: >-
+      {{ (service_restore_manifest_identity.stdout_lines | select('match', '^archive_sha256=') | first | default('archive_sha256=')) | regex_replace('^archive_sha256=', '') }}
+    service_restore_success_backup_id: >-
+      {{ (service_restore_success_identity.stdout_lines | select('match', '^backup_id=') | first | default('backup_id=')) | regex_replace('^backup_id=', '') }}
+    service_restore_success_archive_sha256: >-
+      {{ (service_restore_success_identity.stdout_lines | select('match', '^archive_sha256=') | first | default('archive_sha256=')) | regex_replace('^archive_sha256=', '') }}
+    service_restore_archive_sha256: "{{ service_restore_archive_checksum.stdout.split()[0] }}"
+
+- name: Require a self-consistent published backup identity
+  ansible.builtin.assert:
+    that:
+      - service_restore_manifest_backup_id is match('^[0-9]{8}T[0-9]{6}[+-][0-9]{4}$')
+      - service_restore_manifest_source_host == service_restore_node_name
+      - service_restore_manifest_archive == service_restore_archive_name
+      - service_restore_manifest_archive_sha256 == service_restore_archive_sha256
+      - service_restore_success_backup_id == service_restore_manifest_backup_id
+      - service_restore_success_archive_sha256 == service_restore_archive_sha256
+    fail_msg: >-
+      The published archive, manifest, and success marker do not describe the
+      same verified backup generation.
+
+- name: Read backup manifest appdata size
+  ansible.builtin.command:
+    cmd: "awk '/^appdata_bytes: / { print $2; exit }' {{ service_restore_manifest_name }}"
+    chdir: "{{ service_restore_source }}"
+  register: service_restore_appdata_bytes
+  changed_when: false
+  check_mode: false
+
+- name: Require a valid backup manifest appdata size
+  ansible.builtin.assert:
+    that:
+      - service_restore_appdata_bytes.stdout is match('^[0-9]+$')
+    fail_msg: "The backup manifest has no valid appdata_bytes value."
+
+- name: Check available local restore space
+  ansible.builtin.command:
+    cmd: "df --output=avail -B1 /srv"
+  register: service_restore_free_space
+  changed_when: false
+  check_mode: false
+
+- name: Require sufficient local restore space
+  ansible.builtin.assert:
+    that:
+      - >-
+        (service_restore_free_space.stdout_lines[-1] | trim | int)
+        >= (service_restore_appdata_bytes.stdout | int)
+        + service_restore_free_space_reserve_bytes
+    fail_msg: >-
+      Insufficient free space under /srv for the appdata restore plus the
+      configured safety reserve.
+
+- name: List published appdata archive contents
+  ansible.builtin.command:
+    cmd: >-
+      tar --list --use-compress-program zstd
+      --file {{ service_restore_source }}/{{ service_restore_archive_name }}
+  register: service_restore_archive_listing
+  changed_when: false
+  check_mode: false
+
+- name: Require expected application data in archive
+  ansible.builtin.assert:
+    that: "'./' ~ item ~ '/' in service_restore_archive_listing.stdout_lines"
+    fail_msg: "Expected appdata directory {{ item }} is missing from the archive."
+  loop: "{{ service_restore_expected_directories }}"
+
+- name: Check whether appdata target already exists
+  ansible.builtin.stat:
+    path: "{{ service_restore_target }}"
+  register: service_restore_target_stat
+
+- name: Inspect existing appdata target
+  ansible.builtin.command:
+    cmd: "find {{ service_restore_target }} -mindepth 1 -maxdepth 1 -print -quit"
+  register: service_restore_target_contents
+  changed_when: false
+  check_mode: false
+  when: service_restore_target_stat.stat.exists | default(false)
+
+- name: Require an absent or empty appdata target
+  ansible.builtin.assert:
+    that:
+      - >-
+        not (service_restore_target_stat.stat.exists | default(false))
+        or service_restore_target_stat.stat.isdir | default(false)
+      - >-
+        not (service_restore_target_stat.stat.exists | default(false))
+        or (service_restore_target_contents.stdout | trim | length == 0)
+    fail_msg: >-
+      {{ service_restore_target }} is not empty. This fresh-VM-only restore
+      role will not merge with or overwrite existing application data.
+
+- name: Check whether Docker is installed
+  ansible.builtin.stat:
+    path: /usr/bin/docker
+  register: service_restore_docker_binary
+
+- name: Check Docker runtime state
+  ansible.builtin.command:
+    cmd: docker ps --all --quiet
+  register: service_restore_docker_ps
+  changed_when: false
+  failed_when: false
+  check_mode: false
+  when: service_restore_docker_binary.stat.exists
+
+- name: Require no running Docker containers
+  ansible.builtin.assert:
+    that:
+      - >-
+        not service_restore_docker_binary.stat.exists
+        or (service_restore_docker_ps.rc == 0 and service_restore_docker_ps.stdout | trim | length == 0)
+    fail_msg: >-
+      Docker containers or an inaccessible Docker daemon were detected. This
+      restore must run before Docker application deployment on a fresh VM.
+
+- name: Check backup service state
+  ansible.builtin.command:
+    cmd: systemctl is-active service-appdata-backup.service
+  register: service_restore_backup_service
+  changed_when: false
+  failed_when: false
+  check_mode: false
+
+- name: Require no active appdata backup
+  ansible.builtin.assert:
+    that:
+      - service_restore_backup_service.stdout | trim != 'active'
+    fail_msg: "The appdata backup service is active; wait for it to finish before restoring."
+
+- name: Set restore staging path
+  ansible.builtin.set_fact:
+    service_restore_staging: >-
+      {{ service_restore_parent }}/.appdata.restore-{{ ansible_facts["date_time"]["iso8601_basic_short"] }}
+
+- name: Check restore staging path is unused
+  ansible.builtin.stat:
+    path: "{{ service_restore_staging }}"
+  register: service_restore_staging_stat
+
+- name: Require unused restore staging path
+  ansible.builtin.assert:
+    that:
+      - not (service_restore_staging_stat.stat.exists | default(false))
+    fail_msg: >-
+      Restore staging path already exists: {{ service_restore_staging }}.
+      Investigate the prior restore attempt before retrying.
+
+- name: Report restore plan in check mode
+  ansible.builtin.debug:
+    msg: >-
+      Would restore {{ service_restore_source }}/{{ service_restore_archive_name }}
+      into {{ service_restore_target }} through {{ service_restore_staging }}.
+  when: ansible_check_mode
+
+- name: Create restore parent directory
+  ansible.builtin.file:
+    path: "{{ service_restore_parent }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  when: not ansible_check_mode
+
+- name: Create empty restore staging directory
+  ansible.builtin.file:
+    path: "{{ service_restore_staging }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"
+  when: not ansible_check_mode
+
+- name: Extract appdata archive into restore staging
+  ansible.builtin.command:
+    cmd: >-
+      tar --extract --use-compress-program zstd --numeric-owner --acls --xattrs
+      --xattrs-include=* --file {{ service_restore_source }}/{{ service_restore_archive_name }}
+      --directory {{ service_restore_staging }}
+  when: not ansible_check_mode
+
+- name: Verify extracted application data directories
+  ansible.builtin.stat:
+    path: "{{ service_restore_staging }}/{{ item }}"
+  register: service_restore_extracted_directories
+  loop: "{{ service_restore_expected_directories }}"
+  when: not ansible_check_mode
+
+- name: Require complete extracted application data
+  ansible.builtin.assert:
+    that: "item.stat.isdir | default(false)"
+    fail_msg: "Expected restored application directory is missing: {{ item.item }}"
+  loop: "{{ service_restore_extracted_directories.results }}"
+  when: not ansible_check_mode
+
+- name: Recheck existing appdata target before publication
+  ansible.builtin.command:
+    cmd: "find {{ service_restore_target }} -mindepth 1 -maxdepth 1 -print -quit"
+  register: service_restore_target_before_publish
+  changed_when: false
+  when:
+    - not ansible_check_mode
+    - service_restore_target_stat.stat.exists | default(false)
+
+- name: Require appdata target remains empty before publication
+  ansible.builtin.assert:
+    that:
+      - service_restore_target_before_publish.stdout | trim | length == 0
+    fail_msg: >-
+      {{ service_restore_target }} changed during restore preparation. Refusing
+      to remove an appdata directory that is no longer empty.
+  when:
+    - not ansible_check_mode
+    - service_restore_target_stat.stat.exists | default(false)
+
+- name: Remove verified empty appdata target
+  ansible.builtin.file:
+    path: "{{ service_restore_target }}"
+    state: absent
+  when:
+    - not ansible_check_mode
+    - service_restore_target_stat.stat.exists | default(false)
+
+- name: Publish restored appdata atomically
+  ansible.builtin.command:
+    cmd: "mv {{ service_restore_staging }} {{ service_restore_target }}"
+  when: not ansible_check_mode
+
+- name: Write local appdata restore marker
+  ansible.builtin.copy:
+    dest: "{{ service_restore_marker }}"
+    owner: root
+    group: root
+    mode: "0600"
+    content: |
+      restored_at: {{ ansible_facts["date_time"]["iso8601"] }}
+      source: {{ service_restore_source }}
+      backup_marker: {{ service_restore_success_marker_content.stdout | trim }}
+  when: not ansible_check_mode

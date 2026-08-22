@@ -1,0 +1,61 @@
+---
+- name: Ensure CIFS client utilities are installed
+  ansible.builtin.apt:
+    name: cifs-utils
+    state: present
+
+- name: Require encrypted TrueNAS password
+  ansible.builtin.assert:
+    that:
+      - vault_truenas_smb_password is defined
+      - vault_truenas_smb_password != "REPLACE_ME"
+    fail_msg: >-
+      Create group_vars/all/vault.yml from group_vars/all/vault.yml.example,
+      fill in the SMB password, and encrypt it with ansible-vault.
+
+- name: Look up development user's UID
+  ansible.builtin.command: "id -u {{ dev_user }}"
+  register: dev_uid_cmd
+  changed_when: false
+
+- name: Look up development user's GID
+  ansible.builtin.command: "id -g {{ dev_user }}"
+  register: dev_gid_cmd
+  changed_when: false
+
+- name: Create root-only Samba credentials directory
+  ansible.builtin.file:
+    path: /etc/samba/credentials
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"
+
+- name: Install TrueNAS SMB credentials
+  ansible.builtin.copy:
+    dest: "{{ truenas_credentials_file }}"
+    owner: root
+    group: root
+    mode: "0600"
+    content: |
+      username={{ truenas_smb_username }}
+      password={{ vault_truenas_smb_password }}
+  no_log: true
+
+- name: Create SMB mount points
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: directory
+    owner: "{{ item.mount_owner | default(dev_user) }}"
+    group: "{{ item.mount_group | default(dev_user) }}"
+    mode: "{{ item.dir_mode | default('0755') }}"
+  loop: "{{ smb_mounts }}"
+
+- name: Configure and mount TrueNAS SMB shares
+  ansible.posix.mount:
+    path: "{{ item.path }}"
+    src: "//{{ truenas_server }}/{{ item.share }}"
+    fstype: cifs
+    opts: "credentials={{ truenas_credentials_file }},vers={{ truenas_smb_version }},uid={{ item.mount_uid | default(dev_uid_cmd.stdout) }},gid={{ item.mount_gid | default(dev_gid_cmd.stdout) }},file_mode={{ item.file_mode | default('0644') }},dir_mode={{ item.dir_mode | default('0755') }}{% if item.cifs_noperm | default(true) %},noperm{% endif %},_netdev,nofail,x-systemd.automount"
+    state: mounted
+  loop: "{{ smb_mounts }}"

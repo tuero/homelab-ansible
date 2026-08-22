@@ -1,0 +1,41 @@
+---
+services:
+  homepage:
+    image: "{{ homepage_image }}"
+    container_name: homepage
+
+    environment:
+      HOMEPAGE_ALLOWED_HOSTS: "{{ homepage_host }}"
+
+    volumes:
+      - "{{ monitoring_appdata_root }}/homepage:/app/config"
+      - "{{ monitoring_appdata_root }}/homepage/icons:/app/public/icons:ro"
+
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+    networks:
+      - {{ monitoring_network }}
+
+    restart: unless-stopped
+
+
+  uptime-kuma:
+    image: "{{ uptime_kuma_image }}"
+    container_name: uptime-kuma
+
+    volumes:
+      - "{{ monitoring_appdata_root }}/uptime-kuma:/app/data"
+
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+    networks:
+      - {{ monitoring_network }}
+
+    restart: unless-stopped
+
+
+networks:
+  {{ monitoring_network }}:
+    external: true

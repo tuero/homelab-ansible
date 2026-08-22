@@ -1,0 +1,83 @@
+---
+- name: Check whether Tailscale is already installed
+  ansible.builtin.stat:
+    path: /usr/bin/tailscale
+  register: tailscale_binary
+
+- name: Download Tailscale install script
+  ansible.builtin.get_url:
+    url: https://tailscale.com/install.sh
+    dest: /tmp/tailscale-install.sh
+    mode: "0755"
+  when: not tailscale_binary.stat.exists
+
+- name: Install Tailscale
+  ansible.builtin.command:
+    cmd: /tmp/tailscale-install.sh
+  when: not tailscale_binary.stat.exists
+
+- name: Ensure tailscaled is enabled and running
+  ansible.builtin.systemd:
+    name: tailscaled
+    enabled: true
+    state: started
+
+- name: Enable IPv4 forwarding
+  ansible.posix.sysctl:
+    name: net.ipv4.ip_forward
+    value: "1"
+    state: present
+    sysctl_file: /etc/sysctl.d/99-tailscale.conf
+    reload: true
+
+- name: Enable IPv6 forwarding
+  ansible.posix.sysctl:
+    name: net.ipv6.conf.all.forwarding
+    value: "1"
+    state: present
+    sysctl_file: /etc/sysctl.d/99-tailscale.conf
+    reload: true
+
+- name: Check Tailscale status
+  ansible.builtin.command:
+    cmd: tailscale status --json
+  register: tailscale_status
+  changed_when: false
+  failed_when: false
+
+- name: Determine whether Tailscale is authenticated
+  ansible.builtin.set_fact:
+    tailscale_authenticated: >-
+      {{
+        tailscale_status.rc == 0
+        and tailscale_status.stdout | length > 0
+        and (tailscale_status.stdout | from_json).BackendState == "Running"
+      }}
+
+- name: Configure advertised subnet routes and exit node
+  ansible.builtin.command:
+    argv:
+      - tailscale
+      - set
+      - "--advertise-routes={{ tailscale_advertise_routes }}"
+      - "--advertise-exit-node={{ tailscale_advertise_exit_node | ternary('true', 'false') }}"
+  when:
+    - tailscale_authenticated
+    - tailscale_advertise_routes | length > 0
+  changed_when: false
+
+- name: Display authentication instructions
+  ansible.builtin.debug:
+    msg: |
+      Tailscale is installed but this machine has not yet joined your tailnet.
+
+      SSH into the infra VM and run:
+
+          sudo tailscale up
+
+      Open the authentication URL it displays and authenticate the machine.
+
+      Then rerun:
+
+          ./run.sh --limit infra_servers --tags tailscale
+  when: not tailscale_authenticated

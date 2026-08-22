@@ -1,0 +1,60 @@
+---
+- name: Require encrypted GitHub SSH identity
+  ansible.builtin.assert:
+    that:
+      - vault_github_private_key is defined
+      - vault_github_public_key is defined
+      - "'REPLACE_ME' not in vault_github_private_key"
+      - "'REPLACE_ME' not in vault_github_public_key"
+    fail_msg: >-
+      Put the persistent VM-to-GitHub SSH keypair into the encrypted
+      group_vars/all/vault.yml file.
+
+- name: Ensure user SSH directory exists
+  ansible.builtin.file:
+    path: "{{ dev_home }}/.ssh"
+    state: directory
+    owner: "{{ dev_user }}"
+    group: "{{ dev_user }}"
+    mode: "0700"
+
+- name: Install persistent GitHub private key
+  ansible.builtin.copy:
+    dest: "{{ github_private_key_path }}"
+    content: "{{ vault_github_private_key }}"
+    owner: "{{ dev_user }}"
+    group: "{{ dev_user }}"
+    mode: "0600"
+  no_log: true
+
+- name: Install persistent GitHub public key
+  ansible.builtin.copy:
+    dest: "{{ github_public_key_path }}"
+    content: "{{ vault_github_public_key }}\n"
+    owner: "{{ dev_user }}"
+    group: "{{ dev_user }}"
+    mode: "0644"
+
+- name: Configure SSH to use dedicated GitHub identity
+  ansible.builtin.blockinfile:
+    path: "{{ dev_home }}/.ssh/config"
+    create: true
+    owner: "{{ dev_user }}"
+    group: "{{ dev_user }}"
+    mode: "0600"
+    marker: "# {mark} ANSIBLE GITHUB"
+    block: |
+      Host github.com
+          HostName github.com
+          User git
+          IdentityFile {{ github_private_key_path }}
+          IdentitiesOnly yes
+
+- name: Add GitHub ED25519 host key to known_hosts
+  ansible.builtin.known_hosts:
+    path: "{{ dev_home }}/.ssh/known_hosts"
+    name: "{{ github_host }}"
+    key: "{{ github_host }} {{ github_ed25519_host_key }}"
+    state: present
+  become_user: "{{ dev_user }}"
+  when: github_populate_known_hosts

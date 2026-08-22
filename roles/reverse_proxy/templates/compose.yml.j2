@@ -1,0 +1,38 @@
+---
+services:
+
+  caddy:
+    image: "{{ caddy_image }}"
+
+    build:
+      context: .
+      dockerfile: Dockerfile
+
+    container_name: caddy
+
+    env_file:
+      - path: ./cloudflare.env
+        format: raw
+
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+    volumes:
+      - "./Caddyfile:/etc/caddy/Caddyfile:ro"
+      - "{{ reverse_proxy_appdata }}/data:/data"
+      - "{{ reverse_proxy_appdata }}/config:/config"
+
+    networks:
+      - {{ reverse_proxy_network }}
+
+    restart: unless-stopped
+
+
+networks:
+  {{ reverse_proxy_network }}:
+    external: true

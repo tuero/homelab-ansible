@@ -1,0 +1,57 @@
+---
+- name: Get service user UID
+  ansible.builtin.command:
+    cmd: "id -u {{ dev_user }}"
+  register: arr_uid
+  changed_when: false
+
+- name: Get service user GID
+  ansible.builtin.command:
+    cmd: "id -g {{ dev_user }}"
+  register: arr_gid
+  changed_when: false
+
+- name: Trigger TrueNAS media automount
+  ansible.builtin.command:
+    cmd: ls -ld /mnt/media
+  changed_when: false
+
+- name: Verify media storage is mounted over CIFS
+  ansible.builtin.command:
+    cmd: findmnt -n -t cifs --target /mnt/media
+  changed_when: false
+
+- name: Create arr compose directory
+  ansible.builtin.file:
+    path: "{{ arr_stack_dir }}"
+    state: directory
+    owner: "{{ dev_user }}"
+    group: "{{ dev_user }}"
+    mode: "0755"
+
+- name: Create arr application-data directories
+  ansible.builtin.file:
+    path: "{{ arr_appdata_root }}/{{ item }}"
+    state: directory
+    owner: "{{ dev_user }}"
+    group: "{{ dev_user }}"
+    mode: "0755"
+  loop:
+    - radarr
+    - sonarr
+    - bazarr
+    - prowlarr
+
+- name: Install arr compose file
+  ansible.builtin.template:
+    src: compose.yml.j2
+    dest: "{{ arr_stack_dir }}/compose.yml"
+    owner: "{{ dev_user }}"
+    group: "{{ dev_user }}"
+    mode: "0644"
+
+- name: Deploy arr stack
+  community.docker.docker_compose_v2:
+    project_src: "{{ arr_stack_dir }}"
+    state: present
+    remove_orphans: true

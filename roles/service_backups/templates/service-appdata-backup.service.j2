@@ -1,0 +1,12 @@
+[Unit]
+Description=Backup Docker application data to TrueNAS
+Wants=network-online.target
+After=network-online.target docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/service-appdata-backup
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7

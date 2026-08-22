@@ -1,0 +1,102 @@
+---
+services:
+
+  radarr:
+    image: "{{ arr_images.radarr }}"
+    container_name: radarr
+
+    networks:
+      - default
+      - {{ arr_proxy_network }}
+
+    environment:
+      PUID: "{{ arr_uid.stdout }}"
+      PGID: "{{ arr_gid.stdout }}"
+      TZ: "{{ arr_timezone }}"
+      UMASK: "022"
+
+    volumes:
+      - "{{ arr_appdata_root }}/radarr:/config"
+      - "/mnt/media:/media"
+
+    ports:
+      - "7878:7878"
+
+    restart: unless-stopped
+
+
+  sonarr:
+    image: "{{ arr_images.sonarr }}"
+    container_name: sonarr
+
+    networks:
+      - default
+      - {{ arr_proxy_network }}
+
+    environment:
+      PUID: "{{ arr_uid.stdout }}"
+      PGID: "{{ arr_gid.stdout }}"
+      TZ: "{{ arr_timezone }}"
+      UMASK: "022"
+
+    volumes:
+      - "{{ arr_appdata_root }}/sonarr:/config"
+      - "/mnt/media:/media"
+
+    ports:
+      - "8989:8989"
+
+    restart: unless-stopped
+
+
+  bazarr:
+    image: "{{ arr_images.bazarr }}"
+    container_name: bazarr
+
+    networks:
+      - default
+      - {{ arr_proxy_network }}
+
+    environment:
+      PUID: "{{ arr_uid.stdout }}"
+      PGID: "{{ arr_gid.stdout }}"
+      TZ: "{{ arr_timezone }}"
+      UMASK: "022"
+
+    volumes:
+      - "{{ arr_appdata_root }}/bazarr:/config"
+      - "/mnt/media:/media"
+
+    ports:
+      - "6767:6767"
+
+    restart: unless-stopped
+
+
+  prowlarr:
+    image: "{{ arr_images.prowlarr }}"
+    container_name: prowlarr
+
+    networks:
+      - default
+      - {{ arr_proxy_network }}
+
+    environment:
+      PUID: "{{ arr_uid.stdout }}"
+      PGID: "{{ arr_gid.stdout }}"
+      TZ: "{{ arr_timezone }}"
+      UMASK: "022"
+
+    volumes:
+      - "{{ arr_appdata_root }}/prowlarr:/config"
+
+    ports:
+      - "9696:9696"
+
+    restart: unless-stopped
+
+networks:
+  default:
+
+  {{ arr_proxy_network }}:
+    external: true

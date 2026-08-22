@@ -1,0 +1,10 @@
+---
+monitoring_stack_dir: "/srv/docker/compose/monitoring"
+monitoring_appdata_root: "/srv/docker/appdata"
+monitoring_network: "{{ docker_proxy_network | default('proxy') }}"
+
+homepage_image: "ghcr.io/gethomepage/homepage:v2.0.0@sha256:638dacf5c844e908dc06c1fd57a2b5694f8efd91f91f152829ea0c2f547458f2"
+uptime_kuma_image: "louislam/uptime-kuma:2.5.0@sha256:a8610b3b4c38077922ba51b036691e06887d7cefd91fe620fd3d6d23d03dc240"
+
+homepage_host: "homepage.tuerolab.ca"
+uptime_kuma_host: "status.tuerolab.ca"

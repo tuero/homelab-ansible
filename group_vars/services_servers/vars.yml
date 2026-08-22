@@ -1,0 +1,35 @@
+---
+# -----------------------------------------------------------------------------
+# TrueNAS storage
+# -----------------------------------------------------------------------------
+
+# Bulk media/download storage.
+#
+# TrueNAS:
+#   media/
+#     downloads/
+#     Movies/
+#     Anime/
+#     Anime Movies/
+#     TV Shows/
+#     Sports/
+#
+# Mounted on Ardougne as /mnt/media.
+#
+# Service configuration backups are written to the separate
+# service-backups SMB share.
+docker_proxy_network: "proxy"
+
+smb_mounts:
+  - share: media
+    path: /mnt/media
+
+  - share: service-backups
+    path: /mnt/service-backups
+    mount_owner: root
+    mount_group: root
+    mount_uid: "0"
+    mount_gid: "0"
+    file_mode: "0600"
+    dir_mode: "0700"
+    cifs_noperm: false

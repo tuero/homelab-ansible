@@ -1,0 +1,18 @@
+{
+	acme_dns cloudflare {env.CLOUDFLARE_API_TOKEN}
+}
+
+{% for route in reverse_proxy_routes %}
+{{ route.host }} {
+	{% if route.allowed_networks | default([]) | length > 0 %}
+	@allowed remote_ip {{ route.allowed_networks | join(' ') }}
+	handle @allowed {
+		reverse_proxy {{ route.upstream }}
+	}
+	respond "Forbidden" 403
+	{% else %}
+	reverse_proxy {{ route.upstream }}
+	{% endif %}
+}
+
+{% endfor %}
