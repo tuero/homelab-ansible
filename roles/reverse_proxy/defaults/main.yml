@@ -5,7 +5,8 @@ reverse_proxy_appdata: "/srv/docker/appdata/caddy"
 reverse_proxy_network: "{{ docker_proxy_network | default('proxy') }}"
 
 caddy_version: "2.11.4"
-caddy_image: "tuerolab-caddy:2.11.4-cloudflare"
+caddy_cloudflare_module_version: "v0.2.4"
+caddy_image: "tuerolab-caddy:{{ caddy_version }}-cloudflare"
 
 reverse_proxy_routes:
   # TrueNAS stays directly reachable as Falador; this is its clean UI URL.

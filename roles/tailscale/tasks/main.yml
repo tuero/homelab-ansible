@@ -16,6 +16,13 @@
     cmd: /tmp/tailscale-install.sh
   when: not tailscale_binary.stat.exists
 
+- name: Install requested Tailscale package version
+  ansible.builtin.apt:
+    name: "tailscale={{ tailscale_version }}"
+    state: present
+    allow_downgrade: true
+    update_cache: true
+
 - name: Ensure tailscaled is enabled and running
   ansible.builtin.systemd:
     name: tailscaled

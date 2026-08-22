@@ -80,3 +80,4 @@
     project_src: "{{ downloads_stack_dir }}"
     state: present
     remove_orphans: true
+    pull: always

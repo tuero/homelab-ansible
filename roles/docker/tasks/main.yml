@@ -46,6 +46,7 @@
   ansible.builtin.apt:
     name: "{{ docker_packages }}"
     state: present
+    allow_downgrade: true
     update_cache: true
 
 - name: Ensure Docker service is enabled and running

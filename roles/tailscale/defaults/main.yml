@@ -2,5 +2,7 @@
 # Defaults for the Tailscale role.
 # Override these in group_vars for machines that advertise routes.
 
+tailscale_version: "1.102.2"
+
 tailscale_advertise_routes: ""
 tailscale_advertise_exit_node: false

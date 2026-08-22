@@ -76,10 +76,12 @@
 - name: Install LLVM development tools
   ansible.builtin.apt:
     name:
-      - "clang-format-{{ llvm_version }}"
-      - "clangd-{{ llvm_version }}"
-      - "clang-tidy-{{ llvm_version }}"
+      - "clang-{{ llvm_version }}={{ llvm_package_version }}"
+      - "clang-format-{{ llvm_version }}={{ llvm_package_version }}"
+      - "clangd-{{ llvm_version }}={{ llvm_package_version }}"
+      - "clang-tidy-{{ llvm_version }}={{ llvm_package_version }}"
     state: present
+    allow_downgrade: true
     update_cache: true
 
 # tree-sitter-cli requires the Rust toolchain and LLVM to be present first.
@@ -137,17 +139,23 @@
     state: directory
     mode: "0755"
 
-- name: Check whether GCC {{ gcc_short_version }} is already installed
-  ansible.builtin.stat:
-    path: "/usr/local/bin/gcc-{{ gcc_short_version }}"
-  register: gcc_installed
+- name: Read installed GCC {{ gcc_short_version }} version
+  ansible.builtin.command:
+    cmd: "/usr/local/bin/gcc-{{ gcc_short_version }} -dumpfullversion"
+  register: gcc_version_check
+  changed_when: false
+  failed_when: false
+
+- name: Determine installed GCC version
+  ansible.builtin.set_fact:
+    gcc_installed_version: "{{ gcc_version_check.stdout | trim }}"
 
 - name: Download GCC {{ gcc_version }} release source
   ansible.builtin.get_url:
     url: "{{ gcc_url }}"
     dest: "{{ gcc_tarball }}"
     mode: "0644"
-  when: not gcc_installed.stat.exists
+  when: gcc_installed_version != gcc_version
 
 - name: Extract GCC source
   ansible.builtin.unarchive:
@@ -155,7 +163,7 @@
     dest: /usr/local/src
     remote_src: true
     creates: "{{ gcc_src_dir }}/configure"
-  when: not gcc_installed.stat.exists
+  when: gcc_installed_version != gcc_version
 
 - name: Download GCC prerequisite sources
   ansible.builtin.shell: |
@@ -166,14 +174,14 @@
     executable: /bin/bash
     chdir: "{{ gcc_src_dir }}"
     creates: "{{ gcc_src_dir }}/.ansible-prerequisites-complete"
-  when: not gcc_installed.stat.exists
+  when: gcc_installed_version != gcc_version
 
 - name: Create out-of-tree GCC build directory
   ansible.builtin.file:
     path: "{{ gcc_build_dir }}"
     state: directory
     mode: "0755"
-  when: not gcc_installed.stat.exists
+  when: gcc_installed_version != gcc_version
 
 - name: Configure GCC {{ gcc_version }}
   ansible.builtin.command:
@@ -187,19 +195,18 @@
   args:
     chdir: "{{ gcc_build_dir }}"
     creates: "{{ gcc_build_dir }}/Makefile"
-  when: not gcc_installed.stat.exists
+  when: gcc_installed_version != gcc_version
 
 - name: Build GCC {{ gcc_version }}
   ansible.builtin.command:
     cmd: "make -j{{ gcc_make_jobs }}"
   args:
     chdir: "{{ gcc_build_dir }}"
-  when: not gcc_installed.stat.exists
+  when: gcc_installed_version != gcc_version
 
 - name: Install GCC {{ gcc_version }} side-by-side
   ansible.builtin.command:
     cmd: make install
   args:
     chdir: "{{ gcc_build_dir }}"
-    creates: "/usr/local/bin/gcc-{{ gcc_short_version }}"
-  when: not gcc_installed.stat.exists
+  when: gcc_installed_version != gcc_version

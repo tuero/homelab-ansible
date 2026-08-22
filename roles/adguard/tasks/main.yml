@@ -1,8 +1,20 @@
 ---
-- name: Check whether AdGuard Home is installed
-  ansible.builtin.stat:
-    path: "{{ adguardhome_install_dir }}/AdGuardHome"
-  register: adguardhome_binary
+- name: Read installed AdGuard Home version
+  ansible.builtin.command:
+    cmd: "{{ adguardhome_install_dir }}/AdGuardHome --version"
+  register: adguardhome_version_check
+  changed_when: false
+  failed_when: false
+
+- name: Determine installed AdGuard Home version
+  ansible.builtin.set_fact:
+    adguardhome_installed_version: >-
+      {{
+        adguardhome_version_check.stdout
+        | regex_findall('version (v\\S+)')
+        | first
+        | default('')
+      }}
 
 - name: Download AdGuard Home
   ansible.builtin.get_url:
@@ -12,14 +24,40 @@
       adguardhome_arch }}.tar.gz
     dest: "{{ adguardhome_archive }}"
     mode: "0644"
-  when: not adguardhome_binary.stat.exists
+  when: adguardhome_installed_version != adguardhome_version
 
-- name: Extract AdGuard Home
+- name: Create AdGuard Home release extraction directory
+  ansible.builtin.file:
+    path: "{{ adguardhome_extract_dir }}"
+    state: directory
+    mode: "0755"
+  when: adguardhome_installed_version != adguardhome_version
+
+- name: Extract AdGuard Home release
   ansible.builtin.unarchive:
     src: "{{ adguardhome_archive }}"
-    dest: "/opt"
+    dest: "{{ adguardhome_extract_dir }}"
     remote_src: true
-  when: not adguardhome_binary.stat.exists
+  when: adguardhome_installed_version != adguardhome_version
+
+- name: Create AdGuard Home installation directory
+  ansible.builtin.file:
+    path: "{{ adguardhome_install_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Install requested AdGuard Home binary
+  ansible.builtin.copy:
+    src: "{{ adguardhome_extract_dir }}/AdGuardHome/AdGuardHome"
+    dest: "{{ adguardhome_install_dir }}/AdGuardHome"
+    owner: root
+    group: root
+    mode: "0755"
+    remote_src: true
+  when: adguardhome_installed_version != adguardhome_version
+  notify: Restart AdGuard Home
 
 - name: Check whether AdGuard Home systemd service exists
   ansible.builtin.stat:

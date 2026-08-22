@@ -1,9 +1,10 @@
 ---
-adguardhome_version: "v0.107.78"
+adguardhome_version: "v0.107.79"
 adguardhome_arch: "amd64"
 
 adguardhome_install_dir: "/opt/AdGuardHome"
-adguardhome_archive: "/tmp/AdGuardHome.tar.gz"
+adguardhome_archive: "/tmp/AdGuardHome-{{ adguardhome_version }}.tar.gz"
+adguardhome_extract_dir: "/tmp/AdGuardHome-{{ adguardhome_version }}"
 adguardhome_config_file: "{{ adguardhome_install_dir }}/AdGuardHome.yaml"
 
 adguardhome_bind_ip: "10.0.0.112"

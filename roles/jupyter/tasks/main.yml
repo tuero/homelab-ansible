@@ -1,24 +1,63 @@
 ---
-- name: Check whether JupyterLab environment exists
-  ansible.builtin.stat:
-    path: "{{ jupyter_env_path }}/bin/jupyter"
-  register: jupyter_binary
+- name: Read JupyterLab environment packages
+  ansible.builtin.command:
+    cmd: "{{ miniconda_dir }}/bin/conda list -n {{ jupyter_env_name }} --json"
+  become_user: "{{ dev_user }}"
+  environment:
+    HOME: "{{ dev_home }}"
+  register: jupyter_conda_list
+  changed_when: false
+  failed_when: false
+
+- name: Build installed JupyterLab package map
+  ansible.builtin.set_fact:
+    jupyter_installed_packages: >-
+      {{
+        (jupyter_conda_list.stdout | from_json)
+        | items2dict(key_name='name', value_name='version')
+      }}
+  when: jupyter_conda_list.rc == 0
+
+- name: Determine whether JupyterLab environment needs reconciliation
+  ansible.builtin.set_fact:
+    jupyter_environment_needs_update: >-
+      {{
+        jupyter_conda_list.rc != 0
+        or jupyter_installed_packages.get('python', '') != jupyter_python_version
+        or jupyter_installed_packages.get('jupyterlab', '') != jupyterlab_version
+        or jupyter_installed_packages.get('ipykernel', '') != jupyter_ipykernel_version
+      }}
 
 - name: Create dedicated JupyterLab Conda environment
   ansible.builtin.command:
     cmd: >-
-      {{ miniconda_dir }}/bin/conda create
+      {{ miniconda_dir }}/bin/conda create --override-channels -c conda-forge
+      -n {{ jupyter_env_name }} -y python={{ jupyter_python_version }}
+      jupyterlab={{ jupyterlab_version }} ipykernel={{ jupyter_ipykernel_version }}
+  become_user: "{{ dev_user }}"
+  environment:
+    HOME: "{{ dev_home }}"
+  when: jupyter_conda_list.rc != 0
+  notify: Restart JupyterLab
+
+- name: Reconcile dedicated JupyterLab Conda environment
+  ansible.builtin.command:
+    cmd: >-
+      {{ miniconda_dir }}/bin/conda install
       --override-channels
       -c conda-forge
       -n {{ jupyter_env_name }}
       -y
-      python=3.12
-      jupyterlab
-      ipykernel
+      python={{ jupyter_python_version }}
+      jupyterlab={{ jupyterlab_version }}
+      ipykernel={{ jupyter_ipykernel_version }}
   become_user: "{{ dev_user }}"
   environment:
     HOME: "{{ dev_home }}"
-  when: not jupyter_binary.stat.exists
+  when:
+    - jupyter_conda_list.rc == 0
+    - jupyter_environment_needs_update
+  notify: Restart JupyterLab
 
 - name: Ensure Jupyter configuration directory exists
   ansible.builtin.file:

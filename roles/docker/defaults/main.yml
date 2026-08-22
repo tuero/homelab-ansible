@@ -11,12 +11,17 @@ docker_directories:
 
 docker_apt_arch: "amd64"
 
+docker_ce_version: "5:29.7.2-1~ubuntu.26.04~resolute"
+docker_containerd_version: "2.3.3-1~ubuntu.26.04~resolute"
+docker_buildx_version: "0.36.1-1~ubuntu.26.04~resolute"
+docker_compose_version: "5.4.0-1~ubuntu.26.04~resolute"
+
 docker_packages:
-  - docker-ce
-  - docker-ce-cli
-  - containerd.io
-  - docker-buildx-plugin
-  - docker-compose-plugin
+  - "docker-ce={{ docker_ce_version }}"
+  - "docker-ce-cli={{ docker_ce_version }}"
+  - "containerd.io={{ docker_containerd_version }}"
+  - "docker-buildx-plugin={{ docker_buildx_version }}"
+  - "docker-compose-plugin={{ docker_compose_version }}"
 
 docker_conflicting_packages:
   - docker.io

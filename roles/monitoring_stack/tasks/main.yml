@@ -76,6 +76,7 @@
     project_src: "{{ monitoring_stack_dir }}"
     state: present
     remove_orphans: true
+    pull: always
 
 - name: Recreate Homepage after configuration changes
   community.docker.docker_compose_v2:

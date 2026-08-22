@@ -67,6 +67,85 @@ service_backups
 
 Tag-only runs assume their prerequisites already exist. Use a full host-group run for ordinary fresh provisioning.
 
+## Updating Pinned Software
+
+Ansible converges each managed service to the version or image reference in its
+role variables. Updating a pin does not happen automatically: review the
+release, update the listed variable, take a backup for stateful services, and
+run the scoped command. The same command installs a fresh host or updates an
+existing one without deleting persistent application data.
+
+| Software | Pin variable(s) | Command |
+| --- | --- | --- |
+| AdGuard Home | `adguardhome_version` in `roles/adguard/defaults/main.yml` | `./run.sh --limit infra_servers --tags adguard` |
+| Tailscale | `tailscale_version` in `roles/tailscale/defaults/main.yml` | `./run.sh --limit infra_servers --tags tailscale` |
+| Docker Engine and plugins | `docker_ce_version`, `docker_containerd_version`, `docker_buildx_version`, `docker_compose_version` in `roles/docker/defaults/main.yml` | `./run.sh --limit services_servers --tags docker` |
+| Radarr, Sonarr, Bazarr, Prowlarr | `arr_images.<service>` in `roles/arr_stack/defaults/main.yml` | `./run.sh --limit services_servers --tags arr` |
+| Gluetun and qBittorrent | `gluetun_image`, `qbittorrent_image` in `roles/downloads_stack/defaults/main.yml` | `./run.sh --limit services_servers --tags downloads` |
+| Caddy and Cloudflare module | `caddy_version`, `caddy_cloudflare_module_version` in `roles/reverse_proxy/defaults/main.yml` | `./run.sh --limit services_servers --tags proxy` |
+| Homepage and Uptime Kuma | `homepage_image`, `uptime_kuma_image` in `roles/monitoring_stack/defaults/main.yml` | `./run.sh --limit services_servers --tags monitoring` |
+| LLVM and GCC | `llvm_version`, `llvm_package_version`, `gcc_version` in `group_vars/gpu_servers/vars.yml` | `./run.sh --limit gpu_servers --tags dev` |
+| NVIDIA driver and CUDA toolkit | `nvidia_driver_package`, `cuda_toolkit_version`, `cuda_toolkit_package_version` in `group_vars/gpu_servers/vars.yml` | `./run.sh --limit gpu_servers --tags cuda` |
+| JupyterLab environment | `jupyter_python_version`, `jupyterlab_version`, `jupyter_ipykernel_version` in `group_vars/gpu_servers/vars.yml` | `./run.sh --limit gpu_servers --tags jupyter` |
+
+Docker references use a release tag and immutable digest. Update both together
+after reviewing the upstream release. The Compose roles pull the requested
+image and recreate only changed containers; bind-mounted appdata remains under
+`/srv/docker/appdata`.
+
+Before updating a stateful services-VM application, run and verify its backup:
+
+```bash
+ssh tuero@10.0.0.113 sudo systemctl start service-appdata-backup.service
+ssh tuero@10.0.0.113 systemctl status service-appdata-backup.service
+```
+
+Verify the service version and health after deployment, then commit the updated
+pin. Package repositories can eventually discard old versions, so retain a VM
+backup when changing host packages or drivers.
+
+### Finding APT Package Pins
+
+APT package versions are repository version strings, not release numbers. Do
+not construct or increment them manually: copy a version reported by the
+configured repository. Check the candidate and available versions before
+changing a pin:
+
+```bash
+apt-cache policy <package>
+apt-cache madison <package>
+```
+
+For an LLVM major-version update, change `llvm_version`, then query that major
+and copy the full candidate value into `llvm_package_version`:
+
+```bash
+apt-cache policy clang-23
+
+for package in clang-23 clang-format-23 clangd-23 clang-tidy-23; do
+  apt-cache policy "$package"
+done
+```
+
+Use the same approach for the exact pins in the update table:
+
+```bash
+# Infra VM
+apt-cache policy tailscale
+
+# Services VM
+for package in docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin; do
+  apt-cache policy "$package"
+done
+
+# GPU VM
+apt-cache policy nvidia-driver-595-open cuda-toolkit-13-3
+```
+
+The package version must be available for every package that shares that pin.
+For example, all four LLVM packages use `llvm_package_version`; select a value
+listed for all four, rather than editing its timestamp or suffix by hand.
+
 ## Services Backup
 
 The `service_backups` role creates a daily systemd timer. It quiesces the managed Compose stacks, stages `/srv/docker/appdata`, then publishes one compressed archive to:

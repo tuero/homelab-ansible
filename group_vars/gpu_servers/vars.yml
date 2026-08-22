@@ -23,6 +23,7 @@ gpu_dev_packages:
 
 # Rust / LLVM / Conda
 llvm_version: "22"
+llvm_package_version: "1:22.1.8~++20260714015917+ca7933e47d3a-1~exp1~20260714135927.17"
 miniconda_url: "https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh"
 miniconda_dir: "{{ dev_home }}/miniconda3"
 
@@ -30,7 +31,7 @@ miniconda_dir: "{{ dev_home }}/miniconda3"
 # /usr/bin/gcc. CUDA 13.3 supports GCC through major version 15, while GCC
 # 16.2 is useful for normal C/C++ work.
 gcc_version: "16.2.0"
-gcc_short_version: "16.2"
+gcc_short_version: "{{ gcc_version.split('.')[:2] | join('.') }}"
 gcc_src_dir: "/usr/local/src/gcc-{{ gcc_version }}"
 gcc_build_dir: "/usr/local/src/gcc-{{ gcc_version }}-build"
 gcc_tarball: "/usr/local/src/gcc-{{ gcc_version }}.tar.xz"
@@ -50,8 +51,10 @@ github_populate_known_hosts: true
 
 # CUDA
 cuda_toolkit_version: "13-3"
-cuda_toolkit_package: "cuda-toolkit-{{ cuda_toolkit_version }}"
+cuda_toolkit_package_version: "13.3.1-1"
+cuda_toolkit_package: "cuda-toolkit-{{ cuda_toolkit_version }}={{ cuda_toolkit_package_version }}"
 cuda_keyring_version: "1.1-1"
+nvidia_driver_package: "nvidia-driver-595-open=595.84-0ubuntu0.26.04.1"
 
 cuda_distro_map:
   "22.04": "ubuntu2204"
@@ -61,5 +64,8 @@ cuda_distro_map:
 # JupyterLab
 jupyter_env_name: "jupyterlab"
 jupyter_env_path: "{{ miniconda_dir }}/envs/{{ jupyter_env_name }}"
+jupyter_python_version: "3.12.13"
+jupyterlab_version: "4.6.3"
+jupyter_ipykernel_version: "7.3.0"
 jupyter_port: 8888
 jupyter_root_dir: "{{ dev_home }}"

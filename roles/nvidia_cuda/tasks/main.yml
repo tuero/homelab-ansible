@@ -21,23 +21,19 @@
     state: present
     update_cache: true
 
-- name: Check whether NVIDIA driver is already functional
-  ansible.builtin.command: nvidia-smi
-  register: nvidia_smi_before
-  changed_when: false
-  failed_when: false
-
-- name: Install Ubuntu-recommended NVIDIA driver
-  ansible.builtin.command: ubuntu-drivers install
+- name: Install requested NVIDIA driver
+  ansible.builtin.apt:
+    name: "{{ nvidia_driver_package }}"
+    state: present
+    allow_downgrade: true
+    update_cache: true
   register: nvidia_driver_install
-  when: nvidia_smi_before.rc != 0
 
 - name: Reboot after installing NVIDIA driver
   ansible.builtin.reboot:
     reboot_timeout: 900
   when:
-    - nvidia_smi_before.rc != 0
-    - nvidia_driver_install.changed | default(false)
+    - nvidia_driver_install.changed
 
 - name: Verify NVIDIA driver after reboot
   ansible.builtin.command: nvidia-smi
@@ -58,6 +54,7 @@
   ansible.builtin.apt:
     name: "{{ cuda_toolkit_package }}"
     state: present
+    allow_downgrade: true
     update_cache: true
 
 - name: Add CUDA to interactive shell PATH

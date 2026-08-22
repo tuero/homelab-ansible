@@ -55,3 +55,4 @@
     project_src: "{{ arr_stack_dir }}"
     state: present
     remove_orphans: true
+    pull: always
