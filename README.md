@@ -146,6 +146,34 @@ The package version must be available for every package that shares that pin.
 For example, all four LLVM packages use `llvm_package_version`; select a value
 listed for all four, rather than editing its timestamp or suffix by hand.
 
+## Project Workspace Sync
+
+TrueNAS provides canonical, snapshot-protected project trees through the
+`projects` SMB share mounted at `/mnt/projects` on Varrock. The local workspace
+is `~/projects`; build there rather than on SMB. Create the TrueNAS `projects`
+share before deploying its mount and helper commands:
+
+```bash
+./run.sh --limit gpu_servers --tags storage,projects
+```
+
+The commands are directional and preview by default. Review the itemized
+`rsync` output, then repeat with `--apply` to make the destination match the
+source:
+
+```bash
+project-pull example-project
+project-pull example-project --apply
+
+project-push example-project
+project-push example-project --apply
+```
+
+`.git` directories are synchronized. Generated build and cache paths are
+excluded through `project_sync_excludes` in `group_vars/gpu_servers/vars.yml`.
+The SMB transport does not preserve POSIX ownership or modes; see the GPU VM
+project-workspace documentation for Git executable-bit and symlink guidance.
+
 ## Services Backup
 
 The `service_backups` role creates a daily systemd timer. It quiesces the managed Compose stacks, stages `/srv/docker/appdata`, then publishes one compressed archive to:

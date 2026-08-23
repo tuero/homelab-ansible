@@ -43,6 +43,25 @@ gcc_disable_bootstrap: true
 smb_mounts:
   - share: backup
     path: /mnt/backup
+  - share: projects
+    path: /mnt/projects
+    cifs_mfsymlinks: true
+
+# Work locally on Varrock and synchronize source trees explicitly with the
+# canonical, snapshot-protected TrueNAS copy.
+project_sync_local_root: "{{ dev_home }}/projects"
+project_sync_remote_root: "/mnt/projects"
+project_sync_excludes:
+  - ".cache/"
+  - "build/"
+  - "build-*/"
+  - "cmake-build-*/"
+  - "out/"
+  - "*.a"
+  - "*.d"
+  - "*.o"
+  - "*.so"
+  - "compile_commands.json"
 
 # Persistent VM -> GitHub identity.
 github_private_key_path: "{{ dev_home }}/.ssh/github_ed25519"

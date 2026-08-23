@@ -1,0 +1,33 @@
+---
+- name: Install project synchronization dependency
+  ansible.builtin.apt:
+    name: rsync
+    state: present
+    update_cache: true
+
+- name: Create local project workspace
+  ansible.builtin.file:
+    path: "{{ project_sync_local_root }}"
+    state: directory
+    owner: "{{ dev_user }}"
+    group: "{{ dev_user }}"
+    mode: "0755"
+
+- name: Install project synchronization command
+  ansible.builtin.template:
+    src: project-sync.j2
+    dest: /usr/local/bin/project-sync
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Install project pull and push command aliases
+  ansible.builtin.file:
+    src: /usr/local/bin/project-sync
+    dest: "/usr/local/bin/{{ item }}"
+    state: link
+    owner: root
+    group: root
+  loop:
+    - project-pull
+    - project-push

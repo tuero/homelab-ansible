@@ -1,0 +1,86 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+LOCAL_ROOT="{{ project_sync_local_root }}"
+REMOTE_ROOT="{{ project_sync_remote_root }}"
+COMMAND="$(basename "$0")"
+
+usage() {
+  case "$COMMAND" in
+    project-pull)
+      echo "Usage: project-pull <project> [--apply]" >&2
+      ;;
+    project-push)
+      echo "Usage: project-push <project> [--apply]" >&2
+      ;;
+  esac
+  exit 2
+}
+
+[[ $# -ge 1 && $# -le 2 ]] || usage
+
+PROJECT="$1"
+APPLY="${2:-}"
+
+[[ "$PROJECT" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]] || {
+  echo "Project names may contain only letters, numbers, dots, underscores, and hyphens." >&2
+  exit 2
+}
+[[ "$PROJECT" != "." && "$PROJECT" != ".." ]] || usage
+[[ -z "$APPLY" || "$APPLY" == "--apply" ]] || usage
+
+# Trigger the systemd automount before requiring the TrueNAS share.
+timeout 30 ls "$REMOTE_ROOT" >/dev/null
+mountpoint -q "$REMOTE_ROOT" || {
+  echo "TrueNAS projects share is not mounted at $REMOTE_ROOT." >&2
+  exit 1
+}
+
+LOCAL_PROJECT="$LOCAL_ROOT/$PROJECT"
+REMOTE_PROJECT="$REMOTE_ROOT/$PROJECT"
+
+RSYNC_ARGS=(
+  --recursive
+  --links
+  --times
+  --verbose
+  --no-perms
+  --no-owner
+  --no-group
+  --modify-window=1
+  --delete-delay
+  --itemize-changes
+)
+
+{% for pattern in project_sync_excludes %}
+RSYNC_ARGS+=("--exclude={{ pattern }}")
+{% endfor %}
+
+if [[ -z "$APPLY" ]]; then
+  RSYNC_ARGS+=(--dry-run)
+  echo "Preview only. Re-run with --apply to synchronize."
+fi
+
+case "$COMMAND" in
+  project-pull)
+    [[ -d "$REMOTE_PROJECT" ]] || {
+      echo "Canonical project does not exist on TrueNAS: $REMOTE_PROJECT" >&2
+      exit 1
+    }
+    mkdir -p "$LOCAL_ROOT"
+    echo "Pulling $PROJECT: TrueNAS -> local workspace"
+    rsync "${RSYNC_ARGS[@]}" "$REMOTE_PROJECT/" "$LOCAL_PROJECT/"
+    ;;
+  project-push)
+    [[ -d "$LOCAL_PROJECT" ]] || {
+      echo "Local project does not exist: $LOCAL_PROJECT" >&2
+      exit 1
+    }
+    echo "Pushing $PROJECT: local workspace -> TrueNAS canonical copy"
+    rsync "${RSYNC_ARGS[@]}" "$LOCAL_PROJECT/" "$REMOTE_PROJECT/"
+    ;;
+  *)
+    echo "Install this script as project-pull or project-push." >&2
+    exit 2
+    ;;
+esac

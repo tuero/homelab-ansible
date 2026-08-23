@@ -56,6 +56,6 @@
     path: "{{ item.path }}"
     src: "//{{ truenas_server }}/{{ item.share }}"
     fstype: cifs
-    opts: "credentials={{ truenas_credentials_file }},vers={{ truenas_smb_version }},uid={{ item.mount_uid | default(dev_uid_cmd.stdout) }},gid={{ item.mount_gid | default(dev_gid_cmd.stdout) }},file_mode={{ item.file_mode | default('0644') }},dir_mode={{ item.dir_mode | default('0755') }}{% if item.cifs_noperm | default(true) %},noperm{% endif %},_netdev,nofail,x-systemd.automount"
+    opts: "credentials={{ truenas_credentials_file }},vers={{ truenas_smb_version }},uid={{ item.mount_uid | default(dev_uid_cmd.stdout) }},gid={{ item.mount_gid | default(dev_gid_cmd.stdout) }},file_mode={{ item.file_mode | default('0644') }},dir_mode={{ item.dir_mode | default('0755') }}{% if item.cifs_noperm | default(true) %},noperm{% endif %}{% if item.cifs_mfsymlinks | default(false) %},mfsymlinks{% endif %},_netdev,nofail,x-systemd.automount"
     state: mounted
   loop: "{{ smb_mounts }}"

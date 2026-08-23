@@ -23,6 +23,9 @@
     - role: truenas_mounts
       tags: [storage]
 
+    - role: project_sync
+      tags: [projects]
+
     - role: github_ssh
       tags: [github]
 
