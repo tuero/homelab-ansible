@@ -9,6 +9,14 @@ caddy_cloudflare_module_version: "v0.2.4"
 caddy_image: "tuerolab-caddy:{{ caddy_version }}-cloudflare"
 
 reverse_proxy_routes:
+  # Proxmox uses its self-signed HTTPS listener on the hypervisor.
+  - host: "keldagrim.tuerolab.ca"
+    upstream: "https://10.0.0.110:8006"
+    tls_insecure_skip_verify: true
+    allowed_networks:
+      - "10.0.0.0/24"
+      - "100.64.0.0/10"
+
   # TrueNAS stays directly reachable as Falador; this is its clean UI URL.
   - host: "truenas.tuerolab.ca"
     upstream: "10.0.0.234:81"

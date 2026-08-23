@@ -1,5 +1,6 @@
 {
 	acme_dns cloudflare {env.CLOUDFLARE_API_TOKEN}
+	admin 0.0.0.0:2019
 }
 
 {% for route in reverse_proxy_routes %}
@@ -7,11 +8,27 @@
 	{% if route.allowed_networks | default([]) | length > 0 %}
 	@allowed remote_ip {{ route.allowed_networks | join(' ') }}
 	handle @allowed {
+		{% if route.tls_insecure_skip_verify | default(false) %}
+		reverse_proxy {{ route.upstream }} {
+			transport http {
+				tls_insecure_skip_verify
+			}
+		}
+		{% else %}
 		reverse_proxy {{ route.upstream }}
+		{% endif %}
 	}
 	respond "Forbidden" 403
 	{% else %}
+	{% if route.tls_insecure_skip_verify | default(false) %}
+	reverse_proxy {{ route.upstream }} {
+		transport http {
+			tls_insecure_skip_verify
+		}
+	}
+	{% else %}
 	reverse_proxy {{ route.upstream }}
+	{% endif %}
 	{% endif %}
 }
 

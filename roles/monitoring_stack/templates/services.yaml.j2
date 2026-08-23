@@ -1,48 +1,76 @@
 ---
 - Systems:
+    - Keldagrim:
+        icon: proxmox.png
+        href: https://keldagrim.tuerolab.ca
+        description: "10.0.0.110\nProxmox host"
     - Varrock:
         icon: jupyter.png
         href: https://jupyter.tuerolab.ca
-        description: "10.0.0.111 | GPU development, CUDA, JupyterLab"
+        description: "10.0.0.111\nGPU development, CUDA, JupyterLab"
     - Lumbridge:
         icon: adguard-home.png
         href: https://adguard.tuerolab.ca
-        description: "10.0.0.112 | AdGuard DNS, Tailscale router, exit node"
+        description: "10.0.0.112\nAdGuard DNS, Tailscale router, exit node"
     - Ardougne:
         icon: homepage.png
         href: https://homepage.tuerolab.ca
-        description: "10.0.0.113 | Docker, Caddy, media services, monitoring"
+        description: "10.0.0.113\nDocker, Caddy, media services, monitoring"
     - Falador:
         icon: truenas.png
         href: https://truenas.tuerolab.ca
-        description: "10.0.0.234 | TrueNAS storage, backups, SMB shares"
+        description: "10.0.0.234\nTrueNAS storage, backups, SMB shares"
 
 - Monitoring:
-    - Homepage:
-        icon: homepage.png
-        href: "https://{{ homepage_host }}"
-        description: Service dashboard
-        siteMonitor: http://homepage:3000
     - Uptime Kuma:
         icon: uptime-kuma.png
         href: "https://{{ uptime_kuma_host }}"
         description: Health checks and notifications
         siteMonitor: http://uptime-kuma:3001
+        widget:
+            type: uptimekuma
+            url: "http://uptime-kuma:3001"
+            slug: default
     - Caddy:
         icon: caddy.png
         description: HTTPS reverse proxy
+        widget:
+            type: caddy
+            url: "http://caddy:2019"
 
 - Infrastructure:
+    - Proxmox:
+        icon: proxmox.png
+        href: "https://keldagrim.tuerolab.ca"
+        description: Proxmox Hypervisor
+        siteMonitor: https://10.0.0.110:8006
+        widget:
+            type: proxmox
+            url: https://10.0.0.110:8006
+            username: api@pam!homepage
+            password: "{{ vault_homepage_proxmox_api_token }}"
     - TrueNAS:
         icon: truenas.png
         href: "https://truenas.tuerolab.ca"
         description: Storage on Falador
         siteMonitor: http://10.0.0.234:81
+        widget:
+            type: truenas
+            url: http://10.0.0.234:81
+            version: 1
+            username: root
+            password: "{{ vault_homepage_truenas_password }}"
+            nasType: scale
     - AdGuard Home:
         icon: adguard-home.png
         href: "https://adguard.tuerolab.ca"
         description: DNS and internal rewrites on Lumbridge
         siteMonitor: http://10.0.0.112:3001
+        widget:
+            type: adguard
+            url: http://10.0.0.112:3001
+            username: tuero
+            password: "{{ vault_adguard_password }}"
     - JupyterLab:
         icon: jupyter.png
         href: "https://jupyter.tuerolab.ca"
@@ -55,11 +83,29 @@
         href: "https://radarr.tuerolab.ca"
         description: Movies
         siteMonitor: http://radarr:7878
+        widget:
+            type: radarr
+            url: "http://radarr:7878"
+            key: "{{ vault_homepage_radarr_api_key }}"
     - Sonarr:
         icon: sonarr.png
         href: "https://sonarr.tuerolab.ca"
         description: TV and anime
         siteMonitor: http://sonarr:8989
+        widget:
+            type: sonarr
+            url: "http://sonarr:8989"
+            key: "{{ vault_homepage_sonarr_api_key }}"
+    - qBittorrent:
+        icon: qbittorrent.png
+        href: "https://qbittorrent.tuerolab.ca"
+        description: Downloads through Gluetun
+        siteMonitor: http://host.docker.internal:8080
+        widget:
+            type: qbittorrent
+            url: "http://host.docker.internal:8080"
+            username: tuero
+            password: "{{ vault_homepage_qbittorrent_password }}"
     - Bazarr:
         icon: bazarr.png
         href: "https://bazarr.tuerolab.ca"
@@ -70,11 +116,6 @@
         href: "https://prowlarr.tuerolab.ca"
         description: Indexers
         siteMonitor: http://prowlarr:9696
-    - qBittorrent:
-        icon: qbittorrent.png
-        href: "https://qbittorrent.tuerolab.ca"
-        description: Downloads through Gluetun
-        siteMonitor: http://host.docker.internal:8080
     - Gluetun:
         icon: gluetun.png
         description: VPN network namespace

@@ -23,6 +23,10 @@ adguardhome_dns_rewrites:
   - domain: "falador.tuerolab.ca"
     answer: "10.0.0.234"
 
+  # Proxmox hypervisor
+  - domain: "keldagrim.tuerolab.ca"
+    answer: "10.0.0.113"
+
   # GPU / deep-learning server
   - domain: "varrock.tuerolab.ca"
     answer: "10.0.0.111"

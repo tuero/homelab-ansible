@@ -31,6 +31,15 @@
     mode: "0644"
   register: homepage_settings
 
+- name: Install Homepage custom CSS
+  ansible.builtin.template:
+    src: custom.css.j2
+    dest: "{{ monitoring_appdata_root }}/homepage/custom.css"
+    owner: "{{ dev_user }}"
+    group: "{{ dev_user }}"
+    mode: "0644"
+  register: homepage_custom_css
+
 - name: Remove legacy Homepage Docker integration configuration
   ansible.builtin.file:
     path: "{{ monitoring_appdata_root }}/homepage/docker.yaml"
@@ -87,6 +96,7 @@
     recreate: always
   when: >-
     homepage_settings.changed
+    or homepage_custom_css.changed
     or homepage_bookmarks.changed
     or homepage_icons.changed
     or homepage_services.changed
