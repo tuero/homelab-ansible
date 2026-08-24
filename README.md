@@ -171,8 +171,16 @@ project-push example-project --apply
 
 `.git` directories are synchronized. Generated build and cache paths are
 excluded through `project_sync_excludes` in `group_vars/gpu_servers/vars.yml`.
+Symlinks are preserved through CIFS `mfsymlinks`. A project-root
+`compile_commands.json` symlink is synchronized, while its generated target
+under an excluded build directory is not; the link remains dangling until the
+local build recreates its target.
 The SMB transport does not preserve POSIX ownership or modes; see the GPU VM
 project-workspace documentation for Git executable-bit and symlink guidance.
+When seeding `projects` from a TrueNAS root shell, recursively assign imported
+children to the `tuero` SMB user or reapply the dataset ACL recursively. Dataset
+ownership does not change existing child ownership; root-owned imports can be
+readable but reject updates and `rsync` deletions from Varrock.
 
 ## Services Backup
 

@@ -61,7 +61,6 @@ project_sync_excludes:
   - "*.d"
   - "*.o"
   - "*.so"
-  - "compile_commands.json"
 
 # Persistent VM -> GitHub identity.
 github_private_key_path: "{{ dev_home }}/.ssh/github_ed25519"
