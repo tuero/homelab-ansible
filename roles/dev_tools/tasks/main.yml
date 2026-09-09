@@ -84,6 +84,13 @@
     allow_downgrade: true
     update_cache: true
 
+- name: Link selected clang-format as default
+  ansible.builtin.file:
+    src: "/usr/bin/clang-format-{{ llvm_version }}"
+    dest: /usr/local/bin/clang-format
+    state: link
+    force: true
+
 # tree-sitter-cli requires the Rust toolchain and LLVM to be present first.
 - name: Install tree-sitter CLI through Cargo
   ansible.builtin.command:
@@ -210,3 +217,25 @@
   args:
     chdir: "{{ gcc_build_dir }}"
   when: gcc_installed_version != gcc_version
+
+- name: Register side-by-side GCC libraries with the dynamic linker
+  ansible.builtin.copy:
+    dest: "/etc/ld.so.conf.d/gcc-{{ gcc_short_version }}.conf"
+    content: |
+      /usr/local/lib64
+    mode: "0644"
+
+- name: Refresh dynamic linker cache after GCC installation
+  ansible.builtin.command: ldconfig
+  changed_when: false
+
+- name: Add selected GCC compilers to bashrc
+  ansible.builtin.blockinfile:
+    path: "{{ dev_home }}/.bashrc"
+    owner: "{{ dev_user }}"
+    group: "{{ dev_user }}"
+    marker: "# {mark} ANSIBLE GCC"
+    block: |
+      export CC=/usr/local/bin/gcc-{{ gcc_short_version }}
+      export CXX=/usr/local/bin/g++-{{ gcc_short_version }}
+      export FC=/usr/local/bin/gfortran-{{ gcc_short_version }}

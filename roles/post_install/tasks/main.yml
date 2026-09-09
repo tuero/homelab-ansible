@@ -97,6 +97,17 @@
   environment:
     HOME: "{{ dev_home }}"
 
+- name: Enable tmux mouse support
+  ansible.builtin.blockinfile:
+    path: "{{ dev_home }}/.tmux.conf"
+    create: true
+    owner: "{{ dev_user }}"
+    group: "{{ dev_user }}"
+    mode: "0644"
+    marker: "# {mark} ANSIBLE TMUX"
+    block: |
+      set -g mouse on
+
 
 # ---------------------------------------------------------
 # clangd configuration

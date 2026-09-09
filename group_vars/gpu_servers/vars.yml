@@ -7,11 +7,24 @@ enable_x11_forwarding: true
 # Packages needed by the GPU development environment in addition to the
 # lightweight package set installed by the common role.
 gpu_dev_packages:
+  - autoconf
+  - autoconf-archive
+  - automake
   - build-essential
   - cifs-utils
   - lazygit
+  - libegl1-mesa-dev
+  - libext-dev
   - libgl-dev
+  - libtool
+  - libwayland-dev
   - libx11-dev
+  - libxcursor-dev
+  - libxft-dev
+  - libxi-dev
+  - libxkbcommon-dev
+  - libxrandr-dev
+  - libxtst-dev
   - mesa-utils
   - nodejs
   - npm
