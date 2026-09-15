@@ -63,6 +63,15 @@
     mode: "0644"
   register: homepage_icons
 
+- name: Install official RBC Homepage icon
+  ansible.builtin.get_url:
+    url: https://upload.wikimedia.org/wikipedia/en/7/7f/RBC_Royal_Bank.svg
+    dest: "{{ monitoring_appdata_root }}/homepage/icons/rbc-royal-bank.svg"
+    owner: "{{ dev_user }}"
+    group: "{{ dev_user }}"
+    mode: "0644"
+  register: homepage_rbc_icon
+
 - name: Install Homepage service configuration
   ansible.builtin.template:
     src: services.yaml.j2
@@ -99,4 +108,5 @@
     or homepage_custom_css.changed
     or homepage_bookmarks.changed
     or homepage_icons.changed
+    or homepage_rbc_icon.changed
     or homepage_services.changed
