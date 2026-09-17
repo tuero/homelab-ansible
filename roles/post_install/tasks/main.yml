@@ -180,6 +180,23 @@
   register: opencode_install
   changed_when: "'already installed' not in opencode_install.stdout"
 
+- name: Install OpenCode Codex usage plugin
+  ansible.builtin.command:
+    cmd: npm install -g opencode-codex-usage
+  become_user: "{{ dev_user }}"
+  environment:
+    HOME: "{{ dev_home }}"
+  register: opencode_codex_usage_install
+  changed_when: "'up to date' not in opencode_codex_usage_install.stdout"
+
+- name: Configure OpenCode Codex usage plugin
+  ansible.builtin.command:
+    cmd: opencode-codex-usage --install
+  become_user: "{{ dev_user }}"
+  environment:
+    HOME: "{{ dev_home }}"
+    PATH: "{{ dev_home }}/.opencode/bin:{{ ansible_facts['env']['PATH'] }}"
+
 - name: Add OpenCode to PATH
   ansible.builtin.blockinfile:
     path: "{{ dev_home }}/.bashrc"
@@ -188,3 +205,4 @@
     marker: "# {mark} ANSIBLE OPENCODE"
     block: |
       export PATH="$HOME/.opencode/bin:$PATH"
+      export OPENCODE_CODEX_QUOTA_TOAST_THRESHOLD=always
