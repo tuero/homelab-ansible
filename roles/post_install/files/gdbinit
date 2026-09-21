@@ -1,0 +1,6 @@
+set debuginfod enabled off
+set print thread-events off
+set pagination off
+
+
+add-auto-load-safe-path /usr/local/lib64/libstdc++.so.6.0.36-gdb.py

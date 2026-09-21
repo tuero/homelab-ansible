@@ -12,6 +12,7 @@ gpu_dev_packages:
   - automake
   - build-essential
   - cifs-utils
+  - gdb
   - lazygit
   - libegl1-mesa-dev
   - libext-dev

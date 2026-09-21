@@ -70,6 +70,22 @@
     group: "{{ dev_user }}"
     mode: "0755"
 
+- name: Install GDB configuration
+  ansible.builtin.file:
+    path: "{{ dev_home }}/.config/gdb"
+    state: directory
+    owner: "{{ dev_user }}"
+    group: "{{ dev_user }}"
+    mode: "0755"
+
+- name: Install GDB initialization file
+  ansible.builtin.copy:
+    src: gdbinit
+    dest: "{{ dev_home }}/.config/gdb/gdbinit"
+    owner: "{{ dev_user }}"
+    group: "{{ dev_user }}"
+    mode: "0644"
+
 - name: Clone Neovim configuration
   ansible.builtin.git:
     repo: git@github.com:tuero/astronvim_config.git
