@@ -56,32 +56,63 @@
 
 # ---------------- LLVM ----------------
 
-- name: Check selected LLVM version
-  ansible.builtin.stat:
-    path: "/usr/bin/clang-{{ llvm_version }}"
-  register: llvm_binary
-
-- name: Download official apt.llvm.org installer
+- name: Install apt.llvm.org signing key
   ansible.builtin.get_url:
-    url: https://apt.llvm.org/llvm.sh
-    dest: /tmp/llvm.sh
-    mode: "0755"
-  when: not llvm_binary.stat.exists
+    url: https://apt.llvm.org/llvm-snapshot.gpg.key
+    dest: /etc/apt/trusted.gpg.d/apt.llvm.org.asc
+    mode: "0644"
 
-- name: Install LLVM {{ llvm_version }}
+- name: Configure apt.llvm.org for LLVM {{ llvm_version }}
+  ansible.builtin.deb822_repository:
+    name: apt-llvm
+    types: deb
+    uris: "https://apt.llvm.org/{{ ansible_facts['distribution_release'] }}/"
+    suites: "llvm-toolchain-{{ ansible_facts['distribution_release'] }}-{{ llvm_version }}"
+    components: main
+    signed_by: /etc/apt/trusted.gpg.d/apt.llvm.org.asc
+    state: present
+
+- name: Check for LLDB from the previous LLVM release
   ansible.builtin.command:
-    cmd: "/tmp/llvm.sh {{ llvm_version }}"
-  when: not llvm_binary.stat.exists
+    cmd: >-
+      dpkg-query --show --showformat=${db:Status-Status}
+      liblldb-{{ (llvm_version | int) - 1 }}
+  register: previous_liblldb
+  changed_when: false
+  failed_when: false
+
+- name: Remove conflicting LLDB packages from the previous LLVM release
+  ansible.builtin.command:
+    cmd: >-
+      dpkg --remove --force-depends
+      lldb-{{ (llvm_version | int) - 1 }}
+      python3-lldb-{{ (llvm_version | int) - 1 }}
+      liblldb-{{ (llvm_version | int) - 1 }}
+  when: previous_liblldb.stdout == 'installed'
+
+- name: Check for incomplete APT package installations
+  ansible.builtin.command:
+    cmd: dpkg --audit
+  register: dpkg_audit
+  changed_when: false
+
+- name: Repair incomplete APT package installations
+  ansible.builtin.command:
+    cmd: apt-get --yes --fix-broken install
+  register: apt_fix_broken
+  changed_when: >-
+    '0 upgraded, 0 newly installed, 0 to remove and 0 not upgraded.'
+    not in apt_fix_broken.stdout
+  when: dpkg_audit.stdout | length > 0
 
 - name: Install LLVM development tools
   ansible.builtin.apt:
     name:
-      - "clang-{{ llvm_version }}={{ llvm_package_version }}"
-      - "clang-format-{{ llvm_version }}={{ llvm_package_version }}"
-      - "clangd-{{ llvm_version }}={{ llvm_package_version }}"
-      - "clang-tidy-{{ llvm_version }}={{ llvm_package_version }}"
+      - "clang-{{ llvm_version }}"
+      - "clang-format-{{ llvm_version }}"
+      - "clangd-{{ llvm_version }}"
+      - "clang-tidy-{{ llvm_version }}"
     state: present
-    allow_downgrade: true
     update_cache: true
 
 - name: Link selected clang-format as default

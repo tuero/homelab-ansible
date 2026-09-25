@@ -15,7 +15,7 @@ gpu_dev_packages:
   - gdb
   - lazygit
   - libegl1-mesa-dev
-  - libext-dev
+  - libxext-dev
   - libgl-dev
   - libtool
   - libwayland-dev
@@ -36,8 +36,7 @@ gpu_dev_packages:
   - xauth
 
 # Rust / LLVM / Conda
-llvm_version: "22"
-llvm_package_version: "1:22.1.8~++20260714015917+ca7933e47d3a-1~exp1~20260714135927.17"
+llvm_version: "23"
 miniconda_url: "https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh"
 miniconda_dir: "{{ dev_home }}/miniconda3"
 

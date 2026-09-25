@@ -69,11 +69,9 @@ Tag-only runs assume their prerequisites already exist. Use a full host-group ru
 
 ## Updating Pinned Software
 
-Ansible converges each managed service to the version or image reference in its
-role variables. Updating a pin does not happen automatically: review the
-release, update the listed variable, take a backup for stateful services, and
-run the scoped command. The same command installs a fresh host or updates an
-existing one without deleting persistent application data.
+Ansible converges each managed service to the version or image reference in its role variables.
+Updating a pin does not happen automatically: review the release, update the listed variable, take a backup for stateful services, and run the scoped command.
+The same command installs a fresh host or updates an existing one without deleting persistent application data.
 
 | Software | Pin variable(s) | Command |
 | --- | --- | --- |
@@ -84,14 +82,13 @@ existing one without deleting persistent application data.
 | Gluetun and qBittorrent | `gluetun_image`, `qbittorrent_image` in `roles/downloads_stack/defaults/main.yml` | `./run.sh --limit services_servers --tags downloads` |
 | Caddy and Cloudflare module | `caddy_version`, `caddy_cloudflare_module_version` in `roles/reverse_proxy/defaults/main.yml` | `./run.sh --limit services_servers --tags proxy` |
 | Homepage and Uptime Kuma | `homepage_image`, `uptime_kuma_image` in `roles/monitoring_stack/defaults/main.yml` | `./run.sh --limit services_servers --tags monitoring` |
-| LLVM and GCC | `llvm_version`, `llvm_package_version`, `gcc_version` in `group_vars/gpu_servers/vars.yml` | `./run.sh --limit gpu_servers --tags dev` |
+| LLVM and GCC | `llvm_version`, `gcc_version` in `group_vars/gpu_servers/vars.yml` | `./run.sh --limit gpu_servers --tags dev` |
 | NVIDIA driver and CUDA toolkit | `nvidia_driver_package`, `cuda_toolkit_version`, `cuda_toolkit_package_version` in `group_vars/gpu_servers/vars.yml` | `./run.sh --limit gpu_servers --tags cuda` |
 | JupyterLab environment | `jupyter_python_version`, `jupyterlab_version`, `jupyter_ipykernel_version` in `group_vars/gpu_servers/vars.yml` | `./run.sh --limit gpu_servers --tags jupyter` |
 
-Docker references use a release tag and immutable digest. Update both together
-after reviewing the upstream release. The Compose roles pull the requested
-image and recreate only changed containers; bind-mounted appdata remains under
-`/srv/docker/appdata`.
+Docker references use a release tag and immutable digest.
+Update both together after reviewing the upstream release.
+The Compose roles pull the requested image and recreate only changed containers; bind-mounted appdata remains under `/srv/docker/appdata`.
 
 Before updating a stateful services-VM application, run and verify its backup:
 
@@ -100,31 +97,25 @@ ssh tuero@10.0.0.113 sudo systemctl start service-appdata-backup.service
 ssh tuero@10.0.0.113 systemctl status service-appdata-backup.service
 ```
 
-Verify the service version and health after deployment, then commit the updated
-pin. Package repositories can eventually discard old versions, so retain a VM
-backup when changing host packages or drivers.
+Verify the service version and health after deployment, then commit the updated pin.
+Package repositories can eventually discard old versions, so retain a VM backup when changing host packages or drivers.
 
 ### Finding APT Package Pins
 
-APT package versions are repository version strings, not release numbers. Do
-not construct or increment them manually: copy a version reported by the
-configured repository. Check the candidate and available versions before
-changing a pin:
+APT package versions are repository version strings, not release numbers.
+Do not construct or increment them manually: copy a version reported by the configured repository.
+Check the candidate and available versions before changing a pin:
 
 ```bash
 apt-cache policy <package>
 apt-cache madison <package>
 ```
 
-For an LLVM major-version update, change `llvm_version`, then query that major
-and copy the full candidate value into `llvm_package_version`:
+For an LLVM major-version update, change `llvm_version` and run the development role.
+The role configures the matching apt.llvm.org repository, then installs the current packages for that major:
 
 ```bash
-apt-cache policy clang-23
-
-for package in clang-23 clang-format-23 clangd-23 clang-tidy-23; do
-  apt-cache policy "$package"
-done
+./run.sh --limit gpu_servers --tags dev
 ```
 
 Use the same approach for the exact pins in the update table:
@@ -142,24 +133,19 @@ done
 apt-cache policy nvidia-driver-595-open cuda-toolkit-13-3
 ```
 
-The package version must be available for every package that shares that pin.
-For example, all four LLVM packages use `llvm_package_version`; select a value
-listed for all four, rather than editing its timestamp or suffix by hand.
+The LLVM major version is intentional; apt.llvm.org package build strings are not pinned because a new major's repository must be configured before APT can discover its candidate version.
 
 ## Project Workspace Sync
 
-TrueNAS provides canonical, snapshot-protected project trees through the
-`projects` SMB share mounted at `/mnt/projects` on Varrock. The local workspace
-is `~/projects`; build there rather than on SMB. Create the TrueNAS `projects`
-share before deploying its mount and helper commands:
+TrueNAS provides canonical, snapshot-protected project trees through the `projects` SMB share mounted at `/mnt/projects` on Varrock.
+The local workspace is `~/projects`; build there rather than on SMB. Create the TrueNAS `projects` share before deploying its mount and helper commands:
 
 ```bash
 ./run.sh --limit gpu_servers --tags storage,projects
 ```
 
-The commands are directional and preview by default. Review the itemized
-`rsync` output, then repeat with `--apply` to make the destination match the
-source:
+The commands are directional and preview by default.
+Review the itemized `rsync` output, then repeat with `--apply` to make the destination match the source:
 
 ```bash
 project-pull example-project
@@ -169,22 +155,17 @@ project-push example-project
 project-push example-project --apply
 ```
 
-`.git` directories are synchronized. Generated build and cache paths are
-excluded through `project_sync_excludes` in `group_vars/gpu_servers/vars.yml`.
-Symlinks are preserved through CIFS `mfsymlinks`. A project-root
-`compile_commands.json` symlink is synchronized, while its generated target
-under an excluded build directory is not; the link remains dangling until the
-local build recreates its target.
-The SMB transport does not preserve POSIX ownership or modes; see the GPU VM
-project-workspace documentation for Git executable-bit and symlink guidance.
-When seeding `projects` from a TrueNAS root shell, recursively assign imported
-children to the `tuero` SMB user or reapply the dataset ACL recursively. Dataset
-ownership does not change existing child ownership; root-owned imports can be
-readable but reject updates and `rsync` deletions from Varrock.
+`.git` directories are synchronized. Generated build and cache paths are excluded through `project_sync_excludes` in `group_vars/gpu_servers/vars.yml`.
+Symlinks are preserved through CIFS `mfsymlinks`.
+A project-root `compile_commands.json` symlink is synchronized, while its generated target under an excluded build directory is not; the link remains dangling until the local build recreates its target.
+The SMB transport does not preserve POSIX ownership or modes; see the GPU VM project-workspace documentation for Git executable-bit and symlink guidance.
+When seeding `projects` from a TrueNAS root shell, recursively assign imported children to the `tuero` SMB user or reapply the dataset ACL recursively.
+Dataset ownership does not change existing child ownership; root-owned imports can be readable but reject updates and `rsync` deletions from Varrock.
 
 ## Services Backup
 
-The `service_backups` role creates a daily systemd timer. It quiesces the managed Compose stacks, stages `/srv/docker/appdata`, then publishes one compressed archive to:
+The `service_backups` role creates a daily systemd timer.
+It quiesces the managed Compose stacks, stages `/srv/docker/appdata`, then publishes one compressed archive to:
 
 ```text
 /mnt/service-backups/ardougne/appdata/current/
@@ -210,7 +191,8 @@ journalctl -u service-appdata-backup.service
 
 ## Recover a Fresh Services VM
 
-The restore role is deliberately fresh-VM-only. It refuses to run when `/srv/docker/appdata` contains data, Docker containers are running, or the published archive is incomplete.
+The restore role is deliberately fresh-VM-only.
+It refuses to run when `/srv/docker/appdata` contains data, Docker containers are running, or the published archive is incomplete.
 
 1. Create/restore the Ubuntu VM in Proxmox and ensure its inventory address is reachable.
 2. Install the common base and TrueNAS mounts:
@@ -246,7 +228,8 @@ The restore role is deliberately fresh-VM-only. It refuses to run when `/srv/doc
 ./run.sh --limit services_servers --tags docker,arr,downloads,proxy,monitoring
 ```
 
-6. Validate applications, media access, Gluetun, qBittorrent forwarding, and Caddy. Enable backups only after validation:
+6. Validate applications, media access, Gluetun, qBittorrent forwarding, and Caddy.
+Enable backups only after validation:
 
 ```bash
 ./run.sh --limit services_servers --tags backups
