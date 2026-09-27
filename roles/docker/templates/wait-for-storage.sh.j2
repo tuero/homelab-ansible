@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+set -u
+
+readonly retry_interval={{ docker_storage_retry_interval | int }}
+readonly access_timeout={{ docker_storage_access_timeout | int }}
+readonly required_mounts=(
+{% for mount_path in docker_required_cifs_mounts %}
+  {{ mount_path | quote }}
+{% endfor %}
+)
+
+while true; do
+  all_ready=true
+
+  for mount_path in "${required_mounts[@]}"; do
+    # Reading the directory triggers its systemd automount. Both checks are
+    # required: findmnt verifies CIFS, while ls verifies that the NAS responds.
+    /usr/bin/timeout "$access_timeout" /usr/bin/ls -A "$mount_path" >/dev/null 2>&1 || true
+
+    if ! /usr/bin/findmnt -n -t cifs --target "$mount_path" >/dev/null \
+      || ! /usr/bin/timeout "$access_timeout" /usr/bin/ls -A "$mount_path" >/dev/null 2>&1; then
+      all_ready=false
+      echo "Required CIFS mount is not ready: $mount_path"
+    fi
+  done
+
+  if [[ "$all_ready" == true ]]; then
+    echo "All required CIFS mounts are ready"
+    exit 0
+  fi
+
+  sleep "$retry_interval"
+done

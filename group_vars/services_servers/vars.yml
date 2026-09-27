@@ -20,6 +20,11 @@
 # service-backups SMB share.
 docker_proxy_network: "proxy"
 
+# Docker must not start media-dependent containers before this mount is usable.
+# This gates the Docker daemon, so all containers on this VM wait for the mount.
+docker_required_cifs_mounts:
+  - /mnt/media
+
 smb_mounts:
   - share: media
     path: /mnt/media

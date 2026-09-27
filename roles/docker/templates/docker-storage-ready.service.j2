@@ -1,0 +1,9 @@
+[Unit]
+Description=Wait for required CIFS storage before Docker
+Wants=network-online.target
+After=network-online.target
+Before=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/docker-wait-for-storage

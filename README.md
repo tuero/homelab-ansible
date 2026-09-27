@@ -67,6 +67,38 @@ service_backups
 
 Tag-only runs assume their prerequisites already exist. Use a full host-group run for ordinary fresh provisioning.
 
+## Docker Startup And Network Storage
+
+The services VM prevents Docker from starting until every path in `docker_required_cifs_mounts` is mounted as CIFS and responds to a directory read.
+This handles full-site restarts where the VM boots before TrueNAS is ready.
+The check retries instead of relying on a fixed Proxmox startup delay.
+
+The following containers require `/mnt/media`:
+
+| Container | Storage use |
+| --- | --- |
+| Radarr | Movie library import and management |
+| Sonarr | Series library import and management |
+| Bazarr | Media scanning and subtitle management |
+| qBittorrent | Download storage |
+
+Docker bind mounts use private propagation by default.
+If one of these containers starts against a failed automount, mounting the share later on the host does not repair the container's mount.
+Gating Docker avoids containers that appear healthy but cannot access `/media`.
+
+The readiness service gates the Docker daemon, so all containers on the VM are postponed even if they do not use network storage.
+When adding a container that uses the existing `/mnt/media` mount, no startup configuration change is needed, but add it to the dependency table above.
+When adding a different required CIFS mount, add its absolute host path to `docker_required_cifs_mounts` in `group_vars/services_servers/vars.yml`.
+A container without network-storage bind mounts needs no additional entry.
+
+To diagnose startup waiting on the services VM:
+
+```bash
+systemctl status docker-storage-ready.service docker.service
+journalctl -b -u docker-storage-ready.service
+findmnt -n -t cifs --target /mnt/media
+```
+
 ## Updating Pinned Software
 
 Ansible converges each managed service to the version or image reference in its role variables.
@@ -89,6 +121,46 @@ The same command installs a fresh host or updates an existing one without deleti
 Docker references use a release tag and immutable digest.
 Update both together after reviewing the upstream release.
 The Compose roles pull the requested image and recreate only changed containers; bind-mounted appdata remains under `/srv/docker/appdata`.
+
+### Finding Container Image Pins
+
+For LinuxServer images, use its latest GitHub release to obtain the complete container tag, including the LinuxServer `-ls` revision.
+Then query the image index digest through Docker on the services VM. Set `service` to `radarr`, `sonarr`, `bazarr`, `prowlarr`, or `qbittorrent`:
+
+```bash
+service=radarr
+tag="$(curl -fsSL "https://api.github.com/repos/linuxserver/docker-${service}/releases/latest" \
+  | python3 -c 'import json, sys; print(json.load(sys.stdin)["tag_name"])')"
+digest="$(ssh tuero@10.0.0.113 \
+  "docker buildx imagetools inspect --format '{{.Manifest.Digest}}' lscr.io/linuxserver/${service}:${tag}")"
+printf 'lscr.io/linuxserver/%s:%s@%s\n' "$service" "$tag" "$digest"
+```
+
+For example, the command prints a complete value suitable for an Ansible variable:
+
+```text
+lscr.io/linuxserver/radarr:6.4.4.10685-ls318@sha256:adb6c09d6b729ea5e642c99cea35af72702ef476bf4763f153299ac5db9f0b4f
+```
+
+For non-LinuxServer images, first select and review a release tag from the upstream release page, then resolve that exact tag rather than `latest`:
+
+| Variable | Image | Release source |
+| --- | --- | --- |
+| `gluetun_image` | `qmcgaw/gluetun` | `qdm12/gluetun` GitHub releases |
+| `homepage_image` | `ghcr.io/gethomepage/homepage` | `gethomepage/homepage` GitHub releases |
+| `uptime_kuma_image` | `louislam/uptime-kuma` | `louislam/uptime-kuma` GitHub releases |
+
+```bash
+image=qmcgaw/gluetun
+tag=v3.41.3
+digest="$(ssh tuero@10.0.0.113 \
+  "docker buildx imagetools inspect --format '{{.Manifest.Digest}}' ${image}:${tag}")"
+printf '%s:%s@%s\n' "$image" "$tag" "$digest"
+```
+
+The digest reported by `.Manifest.Digest` is the multi-platform image-index digest used by this repository.
+Do not substitute one of the architecture or attestation digests shown by the unformatted `imagetools inspect` output.
+After updating the corresponding role variable, take a backup and run the scoped command from the table above.
 
 Before updating a stateful services-VM application, run and verify its backup:
 

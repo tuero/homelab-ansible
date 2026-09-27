@@ -3,6 +3,12 @@ docker_user: "{{ dev_user }}"
 
 docker_root_dir: "/srv/docker"
 
+# Docker waits for these CIFS mounts before starting. This prevents containers
+# from retaining an unusable bind mount when network storage boots later.
+docker_required_cifs_mounts: []
+docker_storage_retry_interval: 10
+docker_storage_access_timeout: 15
+
 docker_directories:
   - "{{ docker_root_dir }}"
   - "{{ docker_root_dir }}/appdata"

@@ -49,6 +49,50 @@
     allow_downgrade: true
     update_cache: true
 
+- name: Validate required Docker CIFS mounts
+  ansible.builtin.assert:
+    that:
+      - item is string
+      - item.startswith('/')
+    fail_msg: "docker_required_cifs_mounts entries must be absolute paths"
+  loop: "{{ docker_required_cifs_mounts }}"
+
+- name: Install Docker storage readiness script
+  ansible.builtin.template:
+    src: wait-for-storage.sh.j2
+    dest: /usr/local/sbin/docker-wait-for-storage
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Install Docker storage readiness service
+  ansible.builtin.template:
+    src: docker-storage-ready.service.j2
+    dest: /etc/systemd/system/docker-storage-ready.service
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Create Docker systemd drop-in directory
+  ansible.builtin.file:
+    path: /etc/systemd/system/docker.service.d
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Require storage readiness before Docker starts
+  ansible.builtin.template:
+    src: storage-ready.conf.j2
+    dest: /etc/systemd/system/docker.service.d/storage-ready.conf
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Reload systemd units for Docker storage readiness
+  ansible.builtin.systemd:
+    daemon_reload: true
+
 - name: Ensure Docker service is enabled and running
   ansible.builtin.systemd:
     name: docker
