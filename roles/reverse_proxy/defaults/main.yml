@@ -11,38 +11,38 @@ caddy_image: "tuerolab-caddy:{{ caddy_version }}-cloudflare"
 reverse_proxy_routes:
   # Proxmox uses its self-signed HTTPS listener on the hypervisor.
   - host: "keldagrim.tuerolab.ca"
-    upstream: "https://10.0.0.110:8006"
+    upstream: "https://192.168.2.110:8006"
     tls_insecure_skip_verify: true
     allowed_networks:
-      - "10.0.0.0/24"
+      - "192.168.2.0/24"
       - "100.64.0.0/10"
 
   # TrueNAS stays directly reachable as Falador; this is its clean UI URL.
   - host: "truenas.tuerolab.ca"
-    upstream: "10.0.0.234:81"
+    upstream: "192.168.2.234:81"
     allowed_networks:
-      - "10.0.0.0/24"
+      - "192.168.2.0/24"
       - "100.64.0.0/10"
 
   - host: "homepage.tuerolab.ca"
     upstream: "homepage:3000"
     allowed_networks:
-      - "10.0.0.0/24"
+      - "192.168.2.0/24"
       - "100.64.0.0/10"
 
   - host: "status.tuerolab.ca"
     upstream: "uptime-kuma:3001"
     allowed_networks:
-      - "10.0.0.0/24"
+      - "192.168.2.0/24"
       - "100.64.0.0/10"
 
   # JupyterLab runs on Varrock rather than the Docker host.
   - host: "jupyter.tuerolab.ca"
-    upstream: "10.0.0.111:8888"
+    upstream: "192.168.2.111:8888"
 
   # AdGuard runs on Lumbridge rather than the Docker host.
   - host: "adguard.tuerolab.ca"
-    upstream: "10.0.0.112:3001"
+    upstream: "192.168.2.236:3001"
 
   - host: "radarr.tuerolab.ca"
     upstream: "radarr:7878"

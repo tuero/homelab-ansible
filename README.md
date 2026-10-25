@@ -6,11 +6,19 @@ This repository configures Ubuntu VMs that already exist in Proxmox. Proxmox, Cl
 
 | Group | Inventory host | IP | Role |
 | --- | --- | --- | --- |
-| `gpu_servers` | `gpu-server` | `10.0.0.111` | CUDA development and JupyterLab |
-| `infra_servers` | `infra` | `10.0.0.112` | Tailscale and AdGuard Home |
-| `services_servers` | `services` | `10.0.0.113` | Docker services |
+| `gpu_servers` | `gpu-server` | `192.168.2.111` | CUDA development and JupyterLab |
+| `infra_servers` | `infra` | `192.168.2.236` | Tailscale and AdGuard Home |
+| `services_servers` | `services` | `192.168.2.113` | Docker services |
 
 Cloud-Init creates user `tuero` and installs the controller's initial SSH key. Ansible manages configuration from that point.
+
+Infra uses a static Cloud-Init address (`ip=192.168.2.236/24,gw=192.168.2.1`)
+with NIC MAC `02:24:11:3C:91:94` and initial DNS `192.168.2.1`.
+Keep static host addresses outside Bell's DHCP allocation range. After the
+modem reset, the AdGuard role migrates its persisted listener configuration
+from `192.168.2.212` to the new address. Switch modem DNS to `192.168.2.236` only after
+both public and internal queries directly against AdGuard succeed. Configure
+Tailscale split DNS for `tuerolab.ca` with nameserver `192.168.2.236`.
 
 ## Vault
 
@@ -131,7 +139,7 @@ Then query the image index digest through Docker on the services VM. Set `servic
 service=radarr
 tag="$(curl -fsSL "https://api.github.com/repos/linuxserver/docker-${service}/releases/latest" \
   | python3 -c 'import json, sys; print(json.load(sys.stdin)["tag_name"])')"
-digest="$(ssh tuero@10.0.0.113 \
+digest="$(ssh tuero@192.168.2.113 \
   "docker buildx imagetools inspect --format '{{.Manifest.Digest}}' lscr.io/linuxserver/${service}:${tag}")"
 printf 'lscr.io/linuxserver/%s:%s@%s\n' "$service" "$tag" "$digest"
 ```
@@ -153,7 +161,7 @@ For non-LinuxServer images, first select and review a release tag from the upstr
 ```bash
 image=qmcgaw/gluetun
 tag=v3.41.3
-digest="$(ssh tuero@10.0.0.113 \
+digest="$(ssh tuero@192.168.2.113 \
   "docker buildx imagetools inspect --format '{{.Manifest.Digest}}' ${image}:${tag}")"
 printf '%s:%s@%s\n' "$image" "$tag" "$digest"
 ```
@@ -165,8 +173,8 @@ After updating the corresponding role variable, take a backup and run the scoped
 Before updating a stateful services-VM application, run and verify its backup:
 
 ```bash
-ssh tuero@10.0.0.113 sudo systemctl start service-appdata-backup.service
-ssh tuero@10.0.0.113 systemctl status service-appdata-backup.service
+ssh tuero@192.168.2.113 sudo systemctl start service-appdata-backup.service
+ssh tuero@192.168.2.113 systemctl status service-appdata-backup.service
 ```
 
 Verify the service version and health after deployment, then commit the updated pin.

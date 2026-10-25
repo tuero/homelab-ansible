@@ -198,7 +198,7 @@
 
 - name: Install OpenCode Codex usage plugin
   ansible.builtin.command:
-    cmd: npm install -g opencode-codex-usage
+    cmd: "npm install -g --prefix {{ dev_home }}/.local opencode-codex-usage"
   become_user: "{{ dev_user }}"
   environment:
     HOME: "{{ dev_home }}"
@@ -207,11 +207,11 @@
 
 - name: Configure OpenCode Codex usage plugin
   ansible.builtin.command:
-    cmd: opencode-codex-usage --install
+    cmd: "{{ dev_home }}/.local/bin/opencode-codex-usage --install"
   become_user: "{{ dev_user }}"
   environment:
     HOME: "{{ dev_home }}"
-    PATH: "{{ dev_home }}/.opencode/bin:{{ ansible_facts['env']['PATH'] }}"
+    PATH: "{{ dev_home }}/.local/bin:{{ dev_home }}/.opencode/bin:{{ ansible_facts['env']['PATH'] }}"
 
 - name: Add OpenCode to PATH
   ansible.builtin.blockinfile:
@@ -220,5 +220,5 @@
     group: "{{ dev_user }}"
     marker: "# {mark} ANSIBLE OPENCODE"
     block: |
-      export PATH="$HOME/.opencode/bin:$PATH"
+      export PATH="$HOME/.local/bin:$HOME/.opencode/bin:$PATH"
       export OPENCODE_CODEX_QUOTA_TOAST_THRESHOLD=always

@@ -3,23 +3,23 @@
     - Keldagrim:
         icon: proxmox.png
         href: https://keldagrim.tuerolab.ca
-        description: "10.0.0.110\nProxmox host"
+        description: "192.168.2.110\nProxmox host"
     - Varrock:
         icon: jupyter.png
         href: https://jupyter.tuerolab.ca
-        description: "10.0.0.111\nGPU development, CUDA, JupyterLab"
+        description: "192.168.2.111\nGPU development, CUDA, JupyterLab"
     - Lumbridge:
         icon: adguard-home.png
         href: https://adguard.tuerolab.ca
-        description: "10.0.0.112\nAdGuard DNS, Tailscale router, exit node"
+        description: "192.168.2.236\nAdGuard DNS, Tailscale router, exit node"
     - Ardougne:
         icon: homepage.png
         href: https://homepage.tuerolab.ca
-        description: "10.0.0.113\nDocker, Caddy, media services, monitoring"
+        description: "192.168.2.113\nDocker, Caddy, media services, monitoring"
     - Falador:
         icon: truenas.png
         href: https://truenas.tuerolab.ca
-        description: "10.0.0.234\nTrueNAS storage, backups, SMB shares"
+        description: "192.168.2.234\nTrueNAS storage, backups, SMB shares"
 
 - Monitoring:
     - Uptime Kuma:
@@ -43,20 +43,20 @@
         icon: proxmox.png
         href: "https://keldagrim.tuerolab.ca"
         description: Proxmox Hypervisor
-        siteMonitor: https://10.0.0.110:8006
+        siteMonitor: https://192.168.2.110:8006
         widget:
             type: proxmox
-            url: https://10.0.0.110:8006
+            url: https://192.168.2.110:8006
             username: api@pam!homepage
             password: "{{ vault_homepage_proxmox_api_token }}"
     - TrueNAS:
         icon: truenas.png
         href: "https://truenas.tuerolab.ca"
         description: Storage on Falador
-        siteMonitor: http://10.0.0.234:81
+        siteMonitor: http://192.168.2.234:81
         widget:
             type: truenas
-            url: http://10.0.0.234:81
+            url: http://192.168.2.234:81
             version: 1
             username: root
             password: "{{ vault_homepage_truenas_password }}"
@@ -65,17 +65,17 @@
         icon: adguard-home.png
         href: "https://adguard.tuerolab.ca"
         description: DNS and internal rewrites on Lumbridge
-        siteMonitor: http://10.0.0.112:3001
+        siteMonitor: http://192.168.2.236:3001
         widget:
             type: adguard
-            url: http://10.0.0.112:3001
+            url: http://192.168.2.236:3001
             username: tuero
             password: "{{ vault_adguard_password }}"
     - JupyterLab:
         icon: jupyter.png
         href: "https://jupyter.tuerolab.ca"
         description: GPU development environment
-        siteMonitor: http://10.0.0.111:8888
+        siteMonitor: http://192.168.2.111:8888
 
 - Media:
     - Radarr:

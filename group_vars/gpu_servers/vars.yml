@@ -85,7 +85,7 @@ cuda_toolkit_version: "13-3"
 cuda_toolkit_package_version: "13.3.1-1"
 cuda_toolkit_package: "cuda-toolkit-{{ cuda_toolkit_version }}={{ cuda_toolkit_package_version }}"
 cuda_keyring_version: "1.1-1"
-nvidia_driver_package: "nvidia-driver-595-open=595.84-0ubuntu0.26.04.1"
+nvidia_driver_package: "nvidia-driver-595-open=595.91.07-0ubuntu0.26.04.1"
 
 cuda_distro_map:
   "22.04": "ubuntu2204"

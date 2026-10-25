@@ -37,7 +37,7 @@ enable_x11_forwarding: false
 
 # Shared TrueNAS connection defaults. Only roles/hosts that use the
 # truenas_mounts role will actually mount anything.
-truenas_server: "10.0.0.234"
+truenas_server: "192.168.2.234"
 truenas_smb_username: "tuero"
 truenas_smb_version: "3.1.1"
 truenas_credentials_file: "/etc/samba/credentials/truenas"

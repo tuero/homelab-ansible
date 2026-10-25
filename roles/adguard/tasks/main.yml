@@ -70,17 +70,32 @@
     chdir: "{{ adguardhome_install_dir }}"
   when: not adguardhome_service.stat.exists
 
+- name: Check whether AdGuard Home has completed initial setup
+  ansible.builtin.stat:
+    path: "{{ adguardhome_config_file }}"
+  register: adguardhome_config
+
+- name: Migrate persisted AdGuard Home bind address
+  ansible.builtin.replace:
+    path: "{{ adguardhome_config_file }}"
+    regexp: "{{ adguardhome_previous_bind_ip | regex_escape }}"
+    replace: "{{ adguardhome_bind_ip }}"
+    backup: true
+  when:
+    - adguardhome_config.stat.exists
+    - adguardhome_previous_bind_ip | length > 0
+    - adguardhome_previous_bind_ip != adguardhome_bind_ip
+  notify: Restart AdGuard Home
+
+- name: Apply AdGuard Home bind-address migration
+  ansible.builtin.meta: flush_handlers
+
 - name: Ensure AdGuard Home is enabled and running
   ansible.builtin.systemd:
     name: AdGuardHome
     enabled: true
     state: started
     daemon_reload: true
-
-- name: Check whether AdGuard Home has completed initial setup
-  ansible.builtin.stat:
-    path: "{{ adguardhome_config_file }}"
-  register: adguardhome_config
 
 #
 # First-time configuration
