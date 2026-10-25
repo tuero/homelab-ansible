@@ -39,6 +39,7 @@
   loop:
     - radarr
     - sonarr
+    - tautulli
     - bazarr
     - prowlarr
 

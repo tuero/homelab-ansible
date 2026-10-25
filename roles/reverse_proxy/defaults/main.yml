@@ -50,6 +50,9 @@ reverse_proxy_routes:
   - host: "sonarr.tuerolab.ca"
     upstream: "sonarr:8989"
 
+  - host: "tautulli.tuerolab.ca"
+    upstream: "tautulli:8181"
+
   - host: "bazarr.tuerolab.ca"
     upstream: "bazarr:6767"
 

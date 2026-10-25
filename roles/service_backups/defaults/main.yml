@@ -19,6 +19,7 @@ service_backup_lock_file: "/run/lock/service-appdata-backup.lock"
 service_backup_expected_directories:
   - radarr
   - sonarr
+  - tautulli
   - bazarr
   - prowlarr
   - gluetun

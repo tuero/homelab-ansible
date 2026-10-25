@@ -75,6 +75,23 @@ service_backups
 
 Tag-only runs assume their prerequisites already exist. Use a full host-group run for ordinary fresh provisioning.
 
+### Tautulli
+
+Tautulli runs alongside Radarr and Sonarr in the `arr_stack` Compose project.
+To add it to an already provisioned homelab, update DNS and deploy the service,
+proxy, Homepage entry, and backup configuration:
+
+```bash
+./run.sh --limit infra_servers --tags adguard
+./run.sh --limit services_servers --tags arr,proxy,monitoring,backups
+```
+
+Open `https://tautulli.tuerolab.ca` and complete the setup wizard to connect your
+Plex account and server. Its Web UI also listens on the services VM's port `8181`.
+Settings and history persist in `/srv/docker/appdata/tautulli` and are included
+in the daily appdata backup and fresh-VM restore checks. After deployment, run
+and verify a backup so the recoverable archive includes Tautulli.
+
 ## Docker Startup And Network Storage
 
 The services VM prevents Docker from starting until every path in `docker_required_cifs_mounts` is mounted as CIFS and responds to a directory read.
@@ -118,7 +135,7 @@ The same command installs a fresh host or updates an existing one without deleti
 | AdGuard Home | `adguardhome_version` in `roles/adguard/defaults/main.yml` | `./run.sh --limit infra_servers --tags adguard` |
 | Tailscale | `tailscale_version` in `roles/tailscale/defaults/main.yml` | `./run.sh --limit infra_servers --tags tailscale` |
 | Docker Engine and plugins | `docker_ce_version`, `docker_containerd_version`, `docker_buildx_version`, `docker_compose_version` in `roles/docker/defaults/main.yml` | `./run.sh --limit services_servers --tags docker` |
-| Radarr, Sonarr, Bazarr, Prowlarr | `arr_images.<service>` in `roles/arr_stack/defaults/main.yml` | `./run.sh --limit services_servers --tags arr` |
+| Radarr, Sonarr, Tautulli, Bazarr, Prowlarr | `arr_images.<service>` in `roles/arr_stack/defaults/main.yml` | `./run.sh --limit services_servers --tags arr` |
 | Gluetun and qBittorrent | `gluetun_image`, `qbittorrent_image` in `roles/downloads_stack/defaults/main.yml` | `./run.sh --limit services_servers --tags downloads` |
 | Caddy and Cloudflare module | `caddy_version`, `caddy_cloudflare_module_version` in `roles/reverse_proxy/defaults/main.yml` | `./run.sh --limit services_servers --tags proxy` |
 | Homepage and Uptime Kuma | `homepage_image`, `uptime_kuma_image` in `roles/monitoring_stack/defaults/main.yml` | `./run.sh --limit services_servers --tags monitoring` |
@@ -133,7 +150,7 @@ The Compose roles pull the requested image and recreate only changed containers;
 ### Finding Container Image Pins
 
 For LinuxServer images, use its latest GitHub release to obtain the complete container tag, including the LinuxServer `-ls` revision.
-Then query the image index digest through Docker on the services VM. Set `service` to `radarr`, `sonarr`, `bazarr`, `prowlarr`, or `qbittorrent`:
+Then query the image index digest through Docker on the services VM. Set `service` to `radarr`, `sonarr`, `tautulli`, `bazarr`, `prowlarr`, or `qbittorrent`:
 
 ```bash
 service=radarr

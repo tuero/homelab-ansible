@@ -49,6 +49,29 @@ services:
     restart: unless-stopped
 
 
+  tautulli:
+    image: "{{ arr_images.tautulli }}"
+    container_name: tautulli
+
+    networks:
+      - default
+      - {{ arr_proxy_network }}
+
+    environment:
+      PUID: "{{ arr_uid.stdout }}"
+      PGID: "{{ arr_gid.stdout }}"
+      TZ: "{{ arr_timezone }}"
+      UMASK: "022"
+
+    volumes:
+      - "{{ arr_appdata_root }}/tautulli:/config"
+
+    ports:
+      - "8181:8181"
+
+    restart: unless-stopped
+
+
   bazarr:
     image: "{{ arr_images.bazarr }}"
     container_name: bazarr

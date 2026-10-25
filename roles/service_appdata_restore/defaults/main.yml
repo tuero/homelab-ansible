@@ -24,6 +24,7 @@ service_restore_free_space_reserve_bytes: 1073741824
 service_restore_expected_directories:
   - radarr
   - sonarr
+  - tautulli
   - bazarr
   - prowlarr
   - gluetun
