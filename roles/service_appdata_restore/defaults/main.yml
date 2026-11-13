@@ -22,6 +22,7 @@ service_restore_marker: "{{ service_restore_parent }}/.last-appdata-restore.yml"
 service_restore_free_space_reserve_bytes: 1073741824
 
 service_restore_expected_directories:
+  - plex
   - radarr
   - sonarr
   - tautulli

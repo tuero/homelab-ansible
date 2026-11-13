@@ -37,11 +37,21 @@
     group: "{{ dev_user }}"
     mode: "0755"
   loop:
+    - plex
     - radarr
     - sonarr
     - tautulli
     - bazarr
     - prowlarr
+
+- name: Install Plex claim environment file
+  ansible.builtin.template:
+    src: plex.env.j2
+    dest: "{{ arr_stack_dir }}/plex.env"
+    owner: "{{ dev_user }}"
+    group: "{{ dev_user }}"
+    mode: "0600"
+  no_log: true
 
 - name: Install arr compose file
   ansible.builtin.template:
@@ -52,6 +62,7 @@
     mode: "0644"
 
 - name: Deploy arr stack
+  no_log: "{{ arr_plex_claim | length > 0 }}"
   community.docker.docker_compose_v2:
     project_src: "{{ arr_stack_dir }}"
     state: present

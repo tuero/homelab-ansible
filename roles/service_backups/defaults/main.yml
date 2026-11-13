@@ -17,6 +17,7 @@ service_backup_lock_file: "/run/lock/service-appdata-backup.lock"
 # These directories must exist in a recoverable services backup. Add future
 # stateful services here when their appdata is added to the backup contract.
 service_backup_expected_directories:
+  - plex
   - radarr
   - sonarr
   - tautulli

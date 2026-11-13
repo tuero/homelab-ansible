@@ -1,6 +1,34 @@
 ---
 services:
 
+  plex:
+    image: "{{ arr_images.plex }}"
+    container_name: plex
+
+    networks:
+      - default
+      - {{ arr_proxy_network }}
+
+    env_file:
+      - plex.env
+
+    environment:
+      PUID: "{{ arr_uid.stdout }}"
+      PGID: "{{ arr_gid.stdout }}"
+      TZ: "{{ arr_timezone }}"
+      UMASK: "022"
+      VERSION: "docker"
+
+    volumes:
+      - "{{ arr_appdata_root }}/plex:/config"
+      - "/mnt/media:/media"
+
+    ports:
+      - "32400:32400"
+
+    restart: unless-stopped
+
+
   radarr:
     image: "{{ arr_images.radarr }}"
     container_name: radarr

@@ -75,6 +75,62 @@ service_backups
 
 Tag-only runs assume their prerequisites already exist. Use a full host-group run for ordinary fresh provisioning.
 
+### Plex
+
+Plex is hosted on Ardougne, the services VM (`192.168.2.113`), in the
+`arr_stack` Compose project, with `/mnt/media` mounted at
+`/media` and persistent settings, library metadata, and watch history under
+`/srv/docker/appdata/plex`. Its appdata is included in daily backups and
+fresh-VM restore checks. `VERSION=docker` keeps updates tied to the pinned image.
+
+Run all commands in this section on the Mac that runs Ansible, from
+`~/Documents/homelab-ansible`. Ansible connects to the managed VMs over SSH;
+the claim-token commands run locally on the Mac.
+
+On an already provisioned homelab, update DNS and deploy the media images
+before generating the short-lived first-run claim token:
+
+```bash
+./run.sh --limit infra_servers --tags adguard
+./run.sh --limit services_servers --tags arr,proxy,monitoring,backups
+```
+
+For a new server, get a token from <https://plex.tv/claim>, then run within four
+minutes (the prompt avoids putting the token in shell history):
+
+```bash
+printf 'Plex claim token: '
+read -r -s PLEX_CLAIM; printf '\n'
+export PLEX_CLAIM
+./run.sh --limit services_servers --tags arr
+unset PLEX_CLAIM
+```
+
+This block works in macOS's default Zsh and in Bash. Paste the token at the
+prompt; input is hidden. Ansible writes it to a mode-`0600` `plex.env`
+file and suppresses claim-related task output. Subsequent runs without the
+environment variable clear the token; an already claimed or restored server
+does not need another token.
+
+Open `https://plex.tuerolab.ca/web` (direct access:
+`http://192.168.2.113:32400/web`), sign in, and create libraries using paths such
+as `/media/Movies`, `/media/TV Shows`, and `/media/Anime`. In Plex's advanced
+**Settings > Network**, set **Custom server access URLs** to
+`https://plex.tuerolab.ca:443` so clients can discover the proxy address.
+Tautulli can connect directly to host `plex`, port `32400`, with SSL disabled
+on the shared Docker network. Run and verify an appdata backup after setup.
+
+When migrating an existing Plex installation, transfer its complete Plex Media
+Server data directory while both instances are stopped, preserving the server
+preferences and database. In this container it belongs under
+`/srv/docker/appdata/plex/Library/Application Support/Plex Media Server`, owned
+by the configured service user. Use a Plex version at least as new as the
+source server. Restoring this data retains server identity, metadata, and watch
+history; a claim token alone does not migrate them. Disable automatic trash
+emptying before changing library paths to `/media/...`, then verify libraries,
+playback, and Tautulli before retiring the source instance. Only one instance
+using the migrated server identity should run at a time.
+
 ### Tautulli
 
 Tautulli runs alongside Radarr and Sonarr in the `arr_stack` Compose project.
@@ -104,6 +160,7 @@ The following containers require `/mnt/media`:
 | --- | --- |
 | Radarr | Movie library import and management |
 | Sonarr | Series library import and management |
+| Plex | Media library scanning and streaming |
 | Bazarr | Media scanning and subtitle management |
 | qBittorrent | Download storage |
 
@@ -135,7 +192,7 @@ The same command installs a fresh host or updates an existing one without deleti
 | AdGuard Home | `adguardhome_version` in `roles/adguard/defaults/main.yml` | `./run.sh --limit infra_servers --tags adguard` |
 | Tailscale | `tailscale_version` in `roles/tailscale/defaults/main.yml` | `./run.sh --limit infra_servers --tags tailscale` |
 | Docker Engine and plugins | `docker_ce_version`, `docker_containerd_version`, `docker_buildx_version`, `docker_compose_version` in `roles/docker/defaults/main.yml` | `./run.sh --limit services_servers --tags docker` |
-| Radarr, Sonarr, Tautulli, Bazarr, Prowlarr | `arr_images.<service>` in `roles/arr_stack/defaults/main.yml` | `./run.sh --limit services_servers --tags arr` |
+| Plex, Radarr, Sonarr, Tautulli, Bazarr, Prowlarr | `arr_images.<service>` in `roles/arr_stack/defaults/main.yml` | `./run.sh --limit services_servers --tags arr` |
 | Gluetun and qBittorrent | `gluetun_image`, `qbittorrent_image` in `roles/downloads_stack/defaults/main.yml` | `./run.sh --limit services_servers --tags downloads` |
 | Caddy and Cloudflare module | `caddy_version`, `caddy_cloudflare_module_version` in `roles/reverse_proxy/defaults/main.yml` | `./run.sh --limit services_servers --tags proxy` |
 | Homepage and Uptime Kuma | `homepage_image`, `uptime_kuma_image` in `roles/monitoring_stack/defaults/main.yml` | `./run.sh --limit services_servers --tags monitoring` |
@@ -150,7 +207,7 @@ The Compose roles pull the requested image and recreate only changed containers;
 ### Finding Container Image Pins
 
 For LinuxServer images, use its latest GitHub release to obtain the complete container tag, including the LinuxServer `-ls` revision.
-Then query the image index digest through Docker on the services VM. Set `service` to `radarr`, `sonarr`, `tautulli`, `bazarr`, `prowlarr`, or `qbittorrent`:
+Then query the image index digest through Docker on the services VM. Set `service` to `plex`, `radarr`, `sonarr`, `tautulli`, `bazarr`, `prowlarr`, or `qbittorrent`:
 
 ```bash
 service=radarr

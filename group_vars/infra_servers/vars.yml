@@ -66,6 +66,9 @@ adguardhome_dns_rewrites:
   - domain: "tautulli.tuerolab.ca"
     answer: "192.168.2.113"
 
+  - domain: "plex.tuerolab.ca"
+    answer: "192.168.2.113"
+
   - domain: "bazarr.tuerolab.ca"
     answer: "192.168.2.113"
 

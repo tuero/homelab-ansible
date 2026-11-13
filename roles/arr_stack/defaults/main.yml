@@ -6,7 +6,11 @@ arr_proxy_network: "{{ docker_proxy_network | default('proxy') }}"
 
 arr_timezone: "America/Toronto"
 
+# Optional first-run claim token from https://plex.tv/claim (expires in 4 minutes).
+arr_plex_claim: "{{ lookup('ansible.builtin.env', 'PLEX_CLAIM') }}"
+
 arr_images:
+  plex: "lscr.io/linuxserver/plex:1.43.5.11029-6bf8af3f0-ls329@sha256:8f655bad7dcbc5398a78f70a5af12600b4ed3424f901566ed1eaa6710e9e2334"
   radarr: "lscr.io/linuxserver/radarr:6.4.4.10685-ls318@sha256:adb6c09d6b729ea5e642c99cea35af72702ef476bf4763f153299ac5db9f0b4f"
   sonarr: "lscr.io/linuxserver/sonarr:4.0.20.3014-ls326@sha256:f247545d23ba8b233d6604575347e48a623fe6ad75dda02348bf81917f3b5c06"
   tautulli: "lscr.io/linuxserver/tautulli:v2.18.2-ls249@sha256:c6a48416d16b26f254b000133d2d844c1905ee58ed0f44aad9bda66598d39988"

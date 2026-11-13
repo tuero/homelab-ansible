@@ -53,6 +53,9 @@ reverse_proxy_routes:
   - host: "tautulli.tuerolab.ca"
     upstream: "tautulli:8181"
 
+  - host: "plex.tuerolab.ca"
+    upstream: "plex:32400"
+
   - host: "bazarr.tuerolab.ca"
     upstream: "bazarr:6767"
 
