@@ -289,6 +289,8 @@ apt-cache policy nvidia-driver-595-open cuda-toolkit-13-3
 
 The LLVM major version is intentional; apt.llvm.org package build strings are not pinned because a new major's repository must be configured before APT can discover its candidate version.
 
+The NVIDIA driver package fixes the driver branch (`nvidia-driver-595-open`) without pinning a patch version. OS upgrades can install newer patch releases within that branch, and the NVIDIA role accepts an already installed version rather than downgrading it. The role reboots when its driver installation changes or `/var/run/reboot-required` exists, including when run on its own with `--tags cuda`. The CUDA toolkit retains its exact package version pin.
+
 ## Project Workspace Sync
 
 TrueNAS provides canonical, snapshot-protected project trees through the `projects` SMB share mounted at `/mnt/projects` on Varrock.

@@ -25,15 +25,18 @@
   ansible.builtin.apt:
     name: "{{ nvidia_driver_package }}"
     state: present
-    allow_downgrade: true
     update_cache: true
   register: nvidia_driver_install
 
-- name: Reboot after installing NVIDIA driver
+- name: Check whether an earlier update requires reboot
+  ansible.builtin.stat:
+    path: /var/run/reboot-required
+  register: nvidia_reboot_required
+
+- name: Reboot after installing NVIDIA driver or when an update requires it
   ansible.builtin.reboot:
     reboot_timeout: 900
-  when:
-    - nvidia_driver_install.changed
+  when: nvidia_driver_install.changed or nvidia_reboot_required.stat.exists
 
 - name: Verify NVIDIA driver after reboot
   ansible.builtin.command: nvidia-smi
